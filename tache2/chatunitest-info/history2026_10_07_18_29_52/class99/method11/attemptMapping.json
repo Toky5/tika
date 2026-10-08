@@ -1,0 +1,11 @@
+{
+  "attempt0": {
+    "testClassName": "EndianUtils_readUE7_11_0_Test",
+    "fullName": "org.apache.tika.io.EndianUtils_readUE7_11_0_Test",
+    "path": "C:\\Users\\utilisateur\\tika\\tika-core\\chatunitest-tests\\tika-parent\\tika-core\\org\\apache\\tika\\io\\EndianUtils_readUE7_11_0_Test.java",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io",
+    "methodName": "readUE7",
+    "methodSig": "readUE7(InputStream)"
+  }
+}

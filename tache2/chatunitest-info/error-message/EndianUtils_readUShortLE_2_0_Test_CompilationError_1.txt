@@ -1,0 +1,40 @@
+package org.apache.tika.io;
+
+import org.apache.tika.exception.BufferUnderrunException;
+import org.apache.tika.exception.TikaException;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.*;
+import org.junit.jupiter.api.*;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+import java.io.IOException;
+import java.io.InputStream;
+
+public class EndianUtils_readUShortLE_2_0_Test {
+
+    @Test
+    public void testReadUShortLE() throws IOException, BufferUnderrunException {
+        // Test with a valid input
+        InputStream stream = new ByteArrayInputStream(new byte[] { 0x12, 0x34 });
+        int result = EndianUtils.readUShortLE(stream);
+        assertEquals(0x3412, result);
+        // Test with a negative input
+        stream = new ByteArrayInputStream(new byte[] { 0xFF, 0xFF });
+        result = EndianUtils.readUShortLE(stream);
+        assertEquals(0xFFFF, result);
+        // Test with a buffer underrun
+        stream = new ByteArrayInputStream(new byte[] { 0x12 });
+        assertThrows(BufferUnderrunException.class, () -> {
+            EndianUtils.readUShortLE(stream);
+        });
+    }
+}
+
+--------------------------------------------
+Error in EndianUtils_readUShortLE_2_0_Test: line 3 : cannot find symbol
+  symbol:   class BufferUnderrunException
+  location: package org.apache.tika.exception
+Error in EndianUtils_readUShortLE_2_0_Test: line 17 : cannot find symbol
+  symbol:   class BufferUnderrunException
+  location: class org.apache.tika.io.EndianUtils_readUShortLE_2_0_Test

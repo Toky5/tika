@@ -1,0 +1,43 @@
+package org.apache.tika.io;
+
+import org.apache.tika.io.EndianUtils;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.apache.tika.exception.TikaException;
+import org.mockito.*;
+import org.junit.jupiter.api.*;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+class EndianUtils_readUE7_11_0_Test {
+
+    @Test
+    void testReadUE7() throws IOException {
+        // Test with a single byte
+        InputStream stream = new ByteArrayInputStream(new byte[] { 0b01111111 });
+        assertEquals(63, EndianUtils.readUE7(stream));
+        // Test with multiple bytes
+        stream = new ByteArrayInputStream(new byte[] { 0b10000000, 0b01111111 });
+        assertEquals(128 + 63, EndianUtils.readUE7(stream));
+        // Test with a large number
+        stream = new ByteArrayInputStream(new byte[] { 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111 });
+        assertEquals(0xFFFFFFFFFFFFFFFFL, EndianUtils.readUE7(stream));
+        // Test with an empty stream
+        stream = new ByteArrayInputStream(new byte[] {});
+        assertThrows(IOException.class, () -> EndianUtils.readUE7(stream));
+    }
+}
+
+--------------------------------------------
+Error in EndianUtils_readUE7_11_0_Test: line 23 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_readUE7_11_0_Test: line 26 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_readUE7_11_0_Test: line 26 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_readUE7_11_0_Test: line 26 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_readUE7_11_0_Test: line 26 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_readUE7_11_0_Test: line 26 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_readUE7_11_0_Test: line 26 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_readUE7_11_0_Test: line 26 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_readUE7_11_0_Test: line 26 : incompatible types: possible lossy conversion from int to byte

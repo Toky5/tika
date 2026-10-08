@@ -1,0 +1,88 @@
+package org.apache.tika.io;
+
+import org.apache.tika.exception.TikaException;
+import org.apache.tika.io.EndianUtils;
+import org.apache.tika.io.BufferUnderrunException;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.*;
+import org.junit.jupiter.api.*;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class EndianUtils_readShortBE_1_0_Test {
+
+    @Test
+    public void testReadShortBE() throws IOException, BufferUnderrunException {
+        // Test with a valid short value
+        InputStream stream = new ByteArrayInputStream(new byte[] { 0x12, 0x34 });
+        short expected = (short) 0x1234;
+        short result = EndianUtils.readShortBE(stream);
+        assertEquals(expected, result);
+        // Test with a negative short value
+        stream = new ByteArrayInputStream(new byte[] { (byte) 0xFF, (byte) 0xFE });
+        expected = (short) -2;
+        result = EndianUtils.readShortBE(stream);
+        assertEquals(expected, result);
+        // Test with a BufferUnderrunException
+        stream = new ByteArrayInputStream(new byte[] { 0x12 });
+        assertThrows(BufferUnderrunException.class, () -> EndianUtils.readShortBE(stream));
+    }
+
+    @Test
+    public void testReadUShortBE() throws IOException, BufferUnderrunException {
+        // Test with a valid short value
+        InputStream stream = new ByteArrayInputStream(new byte[] { 0x12, 0x34 });
+        int expected = 0x1234;
+        int result = EndianUtils.readUShortBE(stream);
+        assertEquals(expected, result);
+        // Test with a negative short value
+        stream = new ByteArrayInputStream(new byte[] { (byte) 0xFF, (byte) 0xFE });
+        expected = 0xFFFE;
+        result = EndianUtils.readUShortBE(stream);
+        assertEquals(expected, result);
+        // Test with a BufferUnderrunException
+        stream = new ByteArrayInputStream(new byte[] { 0x12 });
+        assertThrows(BufferUnderrunException.class, () -> EndianUtils.readUShortBE(stream));
+    }
+
+    @Test
+    public void testReadShortBEUsingReflection() throws IOException, BufferUnderrunException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        // Test with a valid short value
+        InputStream stream = new ByteArrayInputStream(new byte[] { 0x12, 0x34 });
+        short expected = (short) 0x1234;
+        Method method = EndianUtils.class.getDeclaredMethod("readShortBE", InputStream.class);
+        method.setAccessible(true);
+        short result = (short) method.invoke(null, stream);
+        assertEquals(expected, result);
+        // Test with a negative short value
+        stream = new ByteArrayInputStream(new byte[] { (byte) 0xFF, (byte) 0xFE });
+        expected = (short) -2;
+        result = (short) method.invoke(null, stream);
+        assertEquals(expected, result);
+        // Test with a BufferUnderrunException
+        stream = new ByteArrayInputStream(new byte[] { 0x12 });
+        assertThrows(BufferUnderrunException.class, () -> method.invoke(null, stream));
+    }
+}
+
+--------------------------------------------
+Error in EndianUtils_readShortBE_1_0_Test: line 5 : cannot find symbol
+  symbol:   class BufferUnderrunException
+  location: package org.apache.tika.io
+Error in EndianUtils_readShortBE_1_0_Test: line 20 : cannot find symbol
+  symbol:   class BufferUnderrunException
+  location: class org.apache.tika.io.EndianUtils_readShortBE_1_0_Test
+Error in EndianUtils_readShortBE_1_0_Test: line 37 : cannot find symbol
+  symbol:   class BufferUnderrunException
+  location: class org.apache.tika.io.EndianUtils_readShortBE_1_0_Test
+Error in EndianUtils_readShortBE_1_0_Test: line 54 : cannot find symbol
+  symbol:   class BufferUnderrunException
+  location: class org.apache.tika.io.EndianUtils_readShortBE_1_0_Test
+Error in EndianUtils_readShortBE_1_0_Test: line 54 : cannot find symbol
+  symbol:   class InvocationTargetException
+  location: class org.apache.tika.io.EndianUtils_readShortBE_1_0_Test

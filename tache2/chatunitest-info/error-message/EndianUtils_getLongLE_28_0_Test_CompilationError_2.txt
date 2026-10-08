@@ -1,0 +1,40 @@
+package org.apache.tika.io;
+
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import java.io.IOException;
+import java.io.InputStream;
+import org.apache.tika.exception.TikaException;
+import org.mockito.*;
+import org.junit.jupiter.api.*;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class EndianUtils_getLongLE_28_0_Test {
+
+    @Test
+    public void testGetLongLE() {
+        // Test with a byte array with a single byte
+        byte[] data1 = new byte[] { 0x00 };
+        assertEquals(0, EndianUtils.getLongLE(data1, 0));
+        // Test with a byte array with multiple bytes
+        byte[] data2 = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 };
+        assertEquals(1, EndianUtils.getLongLE(data2, 0));
+        // Test with a byte array with negative bytes
+        byte[] data3 = new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+        assertEquals(-1, EndianUtils.getLongLE(data3, 0));
+        // Test with a byte array with mixed bytes
+        byte[] data4 = new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 };
+        assertEquals(0x0706050403020100L, EndianUtils.getLongLE(data4, 0));
+    }
+}
+
+--------------------------------------------
+Error in EndianUtils_getLongLE_28_0_Test: line 24 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_getLongLE_28_0_Test: line 24 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_getLongLE_28_0_Test: line 24 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_getLongLE_28_0_Test: line 24 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_getLongLE_28_0_Test: line 24 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_getLongLE_28_0_Test: line 24 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_getLongLE_28_0_Test: line 24 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_getLongLE_28_0_Test: line 24 : incompatible types: possible lossy conversion from int to byte

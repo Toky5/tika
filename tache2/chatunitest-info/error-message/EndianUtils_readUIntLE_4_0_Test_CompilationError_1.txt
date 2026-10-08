@@ -1,0 +1,36 @@
+package org.apache.tika.io;
+
+import org.apache.tika.io.EndianUtils;
+import org.apache.tika.io.BufferUnderrunException;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.*;
+import org.junit.jupiter.api.*;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+import org.apache.tika.exception.TikaException;
+
+class EndianUtils_readUIntLE_4_0_Test {
+
+    @Test
+    void testReadUIntLE() throws IOException, BufferUnderrunException {
+        // Test with a valid input
+        InputStream input = new ByteArrayInputStream(new byte[] { 1, 2, 3, 4 });
+        long result = EndianUtils.readUIntLE(input);
+        assertEquals(0x04030201L, result);
+        // Test with a buffer underrun
+        input = new ByteArrayInputStream(new byte[] { 1, 2, 3 });
+        assertThrows(BufferUnderrunException.class, () -> EndianUtils.readUIntLE(input));
+    }
+}
+
+--------------------------------------------
+Error in EndianUtils_readUIntLE_4_0_Test: line 4 : cannot find symbol
+  symbol:   class BufferUnderrunException
+  location: package org.apache.tika.io
+Error in EndianUtils_readUIntLE_4_0_Test: line 19 : cannot find symbol
+  symbol:   class BufferUnderrunException
+  location: class org.apache.tika.io.EndianUtils_readUIntLE_4_0_Test

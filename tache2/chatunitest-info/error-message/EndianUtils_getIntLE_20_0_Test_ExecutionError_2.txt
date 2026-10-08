@@ -1,0 +1,58 @@
+package org.apache.tika.io;
+
+import org.apache.tika.io.EndianUtils;
+import java.lang.reflect.Method;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import java.io.IOException;
+import java.io.InputStream;
+import org.apache.tika.exception.TikaException;
+import org.mockito.*;
+import org.junit.jupiter.api.*;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class EndianUtils_getIntLE_20_0_Test {
+
+    @Test
+    public void testGetIntLE() throws Exception {
+        byte[] data = new byte[] { 0x00, 0x01, 0x02, 0x03 };
+        int result = EndianUtils.getIntLE(data);
+        assertEquals(0x03020100, result);
+        // Test with offset
+        result = EndianUtils.getIntLE(data, 1);
+        assertEquals(0x02030001, result);
+        // Test with negative offset
+        assertThrows(IndexOutOfBoundsException.class, () -> {
+            EndianUtils.getIntLE(data, -1);
+        });
+        // Test with offset greater than data length
+        assertThrows(IndexOutOfBoundsException.class, () -> {
+            EndianUtils.getIntLE(data, 4);
+        });
+    }
+
+    @Test
+    public void testGetIntLEUsingReflection() throws Exception {
+        byte[] data = new byte[] { 0x00, 0x01, 0x02, 0x03 };
+        Method method = EndianUtils.class.getDeclaredMethod("getIntLE", byte[].class, int.class);
+        method.setAccessible(true);
+        int result = (int) method.invoke(null, data, 0);
+        assertEquals(0x03020100, result);
+        // Test with offset
+        result = (int) method.invoke(null, data, 1);
+        assertEquals(0x02030001, result);
+        // Test with negative offset
+        assertThrows(IndexOutOfBoundsException.class, () -> {
+            method.invoke(null, data, -1);
+        });
+        // Test with offset greater than data length
+        assertThrows(IndexOutOfBoundsException.class, () -> {
+            method.invoke(null, data, 4);
+        });
+    }
+}
+
+--------------------------------------------
+Error in testGetIntLE(): line 23 : java.lang.ArrayIndexOutOfBoundsException: Index 4 out of bounds for length 4
+Error in testGetIntLEUsingReflection(): line 43 : java.lang.ArrayIndexOutOfBoundsException: Index 4 out of bounds for length 4

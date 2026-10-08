@@ -1,0 +1,188 @@
+{
+  "method0": {
+    "methodName": "readShortLE",
+    "signature": "readShortLE(InputStream)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method1": {
+    "methodName": "readShortBE",
+    "signature": "readShortBE(InputStream)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method10": {
+    "methodName": "readLongBE",
+    "signature": "readLongBE(InputStream)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method11": {
+    "methodName": "readUE7",
+    "signature": "readUE7(InputStream)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method12": {
+    "methodName": "getShortLE",
+    "signature": "getShortLE(byte[])",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method13": {
+    "methodName": "getShortLE",
+    "signature": "getShortLE(byte[], int)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method14": {
+    "methodName": "getUShortLE",
+    "signature": "getUShortLE(byte[])",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method15": {
+    "methodName": "getUShortLE",
+    "signature": "getUShortLE(byte[], int)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method16": {
+    "methodName": "getShortBE",
+    "signature": "getShortBE(byte[])",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method17": {
+    "methodName": "getShortBE",
+    "signature": "getShortBE(byte[], int)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method18": {
+    "methodName": "getUShortBE",
+    "signature": "getUShortBE(byte[])",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method19": {
+    "methodName": "getUShortBE",
+    "signature": "getUShortBE(byte[], int)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method2": {
+    "methodName": "readUShortLE",
+    "signature": "readUShortLE(InputStream)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method20": {
+    "methodName": "getIntLE",
+    "signature": "getIntLE(byte[])",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method21": {
+    "methodName": "getIntLE",
+    "signature": "getIntLE(byte[], int)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method22": {
+    "methodName": "getIntBE",
+    "signature": "getIntBE(byte[])",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method23": {
+    "methodName": "getIntBE",
+    "signature": "getIntBE(byte[], int)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method24": {
+    "methodName": "getUIntLE",
+    "signature": "getUIntLE(byte[])",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method25": {
+    "methodName": "getUIntLE",
+    "signature": "getUIntLE(byte[], int)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method26": {
+    "methodName": "getUIntBE",
+    "signature": "getUIntBE(byte[])",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method27": {
+    "methodName": "getUIntBE",
+    "signature": "getUIntBE(byte[], int)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method28": {
+    "methodName": "getLongLE",
+    "signature": "getLongLE(byte[], int)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method29": {
+    "methodName": "ubyteToInt",
+    "signature": "ubyteToInt(byte)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method3": {
+    "methodName": "readUShortBE",
+    "signature": "readUShortBE(InputStream)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method30": {
+    "methodName": "getUByte",
+    "signature": "getUByte(byte[], int)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method4": {
+    "methodName": "readUIntLE",
+    "signature": "readUIntLE(InputStream)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method5": {
+    "methodName": "readUIntBE",
+    "signature": "readUIntBE(InputStream)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method6": {
+    "methodName": "readIntLE",
+    "signature": "readIntLE(InputStream)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method7": {
+    "methodName": "readIntBE",
+    "signature": "readIntBE(InputStream)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method8": {
+    "methodName": "readIntME",
+    "signature": "readIntME(InputStream)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  },
+  "method9": {
+    "methodName": "readLongLE",
+    "signature": "readLongLE(InputStream)",
+    "className": "EndianUtils",
+    "packageName": "org.apache.tika.io"
+  }
+}

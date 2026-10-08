@@ -1,0 +1,76 @@
+package org.apache.tika.io;
+
+import org.apache.tika.io.EndianUtils;
+import org.mockito.*;
+import org.junit.jupiter.api.*;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import java.io.IOException;
+import java.io.InputStream;
+import org.apache.tika.exception.TikaException;
+
+public class EndianUtils_getUIntBE_26_0_Test {
+
+    @Test
+    public void testGetUIntBE() {
+        byte[] data = new byte[] { 0x00, 0x00, 0x00, 0x01 };
+        long result = EndianUtils.getUIntBE(data);
+        assertEquals(1, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(1, result);
+        data = new byte[] { 0xFF, 0xFF, 0xFF, 0xFF };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(-1, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x02 };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(2, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x03 };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(3, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x04 };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(4, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x05 };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(5, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x06 };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(6, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x07 };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(7, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x08 };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(8, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x09 };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(9, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x0A };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(10, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x0B };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(11, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x0C };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(12, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x0D };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(13, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x0E };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(14, result);
+        data = new byte[] { 0x00, 0x00, 0x00, 0x0F };
+        result = EndianUtils.getUIntBE(data);
+        assertEquals(15, result);
+    }
+}
+
+--------------------------------------------
+Error in EndianUtils_getUIntBE_26_0_Test: line 24 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_getUIntBE_26_0_Test: line 24 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_getUIntBE_26_0_Test: line 24 : incompatible types: possible lossy conversion from int to byte
+Error in EndianUtils_getUIntBE_26_0_Test: line 24 : incompatible types: possible lossy conversion from int to byte

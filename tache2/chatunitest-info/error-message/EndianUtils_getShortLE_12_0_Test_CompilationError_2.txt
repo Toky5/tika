@@ -1,0 +1,43 @@
+package org.apache.tika.io;
+
+import org.apache.tika.io.EndianUtils;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import java.io.IOException;
+import java.io.InputStream;
+import org.apache.tika.exception.TikaException;
+import org.mockito.*;
+import org.junit.jupiter.api.*;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class EndianUtils_getShortLE_12_0_Test {
+
+    @Test
+    public void testGetShortLE() {
+        // Test with a valid short value
+        byte[] data = new byte[] { 0x12, 0x34 };
+        int expected = 0x3412;
+        int result = EndianUtils.getShortLE(data);
+        assertEquals(expected, result);
+        // Test with a negative short value
+        data = new byte[] { (byte) 0xFF, (byte) 0xFE };
+        expected = 0xFEFF;
+        result = EndianUtils.getShortLE(data);
+        assertEquals(expected, result);
+        // Test with a null input
+        data = null;
+        assertThrows(NullPointerException.class, () -> EndianUtils.getShortLE(data));
+        // Test with an empty input
+        data = new byte[] {};
+        assertThrows(IndexOutOfBoundsException.class, () -> EndianUtils.getShortLE(data));
+        // Test with an input with less than 2 bytes
+        data = new byte[] { 0x12 };
+        assertThrows(IndexOutOfBoundsException.class, () -> EndianUtils.getShortLE(data));
+    }
+}
+
+--------------------------------------------
+Error in EndianUtils_getShortLE_12_0_Test: line 30 : local variables referenced from a lambda expression must be final or effectively final
+Error in EndianUtils_getShortLE_12_0_Test: line 33 : local variables referenced from a lambda expression must be final or effectively final
+Error in EndianUtils_getShortLE_12_0_Test: line 36 : local variables referenced from a lambda expression must be final or effectively final
