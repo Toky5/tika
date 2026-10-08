@@ -15,12 +15,14 @@
 # limitations under the License.
 #
 # Tâche 2 (IFT3913) : exécute tous les tests de tika-core (tests d'origine, tests générés
-# par ChatUniTest et tests écrits à la main), puis lance PIT trois fois sur EndianUtils
-# pour reproduire la comparaison du README :
+# par ChatUniTest et tests écrits à la main), puis mesure la couverture JaCoCo et lance PIT
+# sur EndianUtils pour chacune des quatre suites de tests du README :
 #   1. tests d'origine seulement ;
-#   2. tests d'origine + tests générés par ChatUniTest (classes EndianUtils_*_Test) ;
-#   3. tests d'origine + tests générés + tests écrits à la main (EndianUtilsMutationTest).
-# ChatUniTest lui-même n'est pas relancé ici : il a besoin d'un LLM local (voir le README).
+#   2. + tests générés par ChatUniTest (classes EndianUtils_*_Test) ;
+#   3. + tests écrits à la main pour les mutants survivants (EndianUtilsMutationTest) ;
+#   4. + tests écrits à la main pour le code non couvert (EndianUtilsCouvertureTest).
+# L'artefact « tache2-rapports » contient les rapports, rangés comme dans le dossier tache2/
+# du dépôt. ChatUniTest n'est pas relancé ici : il a besoin d'un LLM local (voir le README).
 
 name: "Tâche 2 - tests et mutation (EndianUtils)"
 
@@ -42,7 +44,8 @@ concurrency:
 env:
   MVN: ./mvnw -B -ntp
   TESTS_GENERES: org.apache.tika.io.EndianUtils_*_Test
-  TESTS_MANUELS: org.apache.tika.io.EndianUtilsMutationTest
+  TESTS_MUTATION: org.apache.tika.io.EndianUtilsMutationTest
+  TESTS_COUVERTURE: org.apache.tika.io.EndianUtilsCouvertureTest
 
 jobs:
   tests-et-mutation:
@@ -61,54 +64,110 @@ jobs:
       - name: Compiler tika-core et exécuter tous ses tests
         run: $MVN -pl tika-core -am install
 
-      - name: "PIT 1/3 : tests d'origine"
+      - name: "Couverture JaCoCo d'EndianUtils, pour chacune des quatre suites"
+        run: |
+          mkdir -p rapports
+          echo "mesure,instructions_couvertes,instructions,branches_couvertes,branches,lignes_couvertes,lignes,methodes_couvertes,methodes" > rapports/couverture-jacoco.csv
+          mesurer() {
+            $MVN -pl tika-core test -Djacoco.append=false -Dtest="$2"
+            python3 - "$1" >> rapports/couverture-jacoco.csv <<'PY'
+          import csv, sys
+          for r in csv.DictReader(open("tika-core/target/site/jacoco/jacoco.csv")):
+              if r["PACKAGE"] == "org.apache.tika.io" and r["CLASS"] == "EndianUtils":
+                  colonnes = [sys.argv[1]]
+                  for k in ("INSTRUCTION", "BRANCH", "LINE", "METHOD"):
+                      couvert = int(r[k + "_COVERED"])
+                      colonnes += [str(couvert), str(couvert + int(r[k + "_MISSED"]))]
+                  print(",".join(colonnes))
+          PY
+          }
+          mesurer 1-tests-originaux "EndianUtilsTest"
+          mesurer 2-avec-tests-generes "EndianUtilsTest,EndianUtils_*_Test"
+          mesurer 3-avec-tests-manuels "EndianUtilsTest,EndianUtils_*_Test,EndianUtilsMutationTest"
+          mesurer 4-avec-tests-de-couverture "EndianUtilsTest,EndianUtils_*_Test,EndianUtilsMutationTest,EndianUtilsCouvertureTest"
+          cat rapports/couverture-jacoco.csv
+
+      - name: "PIT 1/4 : tests d'origine"
         run: >
           $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage
-          -DexcludedTestClasses="$TESTS_GENERES,$TESTS_MANUELS"
+          -DexcludedTestClasses="$TESTS_GENERES,$TESTS_MUTATION,$TESTS_COUVERTURE"
           -DreportsDirectory="$GITHUB_WORKSPACE/rapports/pit-1-tests-originaux"
 
-      - name: "PIT 2/3 : + tests générés par ChatUniTest"
+      - name: "PIT 2/4 : + tests générés par ChatUniTest"
         run: >
           $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage
-          -DexcludedTestClasses="$TESTS_MANUELS"
+          -DexcludedTestClasses="$TESTS_MUTATION,$TESTS_COUVERTURE"
           -DreportsDirectory="$GITHUB_WORKSPACE/rapports/pit-2-avec-tests-generes"
 
-      - name: "PIT 3/3 : + tests écrits à la main"
+      - name: "PIT 3/4 : + tests écrits à la main pour les mutants survivants"
         run: >
           $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage
+          -DexcludedTestClasses="$TESTS_COUVERTURE"
           -DreportsDirectory="$GITHUB_WORKSPACE/rapports/pit-3-avec-tests-manuels"
+
+      - name: "PIT 4/4 : + tests écrits à la main pour le code non couvert"
+        run: >
+          $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage
+          -DreportsDirectory="$GITHUB_WORKSPACE/rapports/pit-4-avec-tests-de-couverture"
 
       - name: Résumé des résultats
         if: always()
         run: |
-          python3 - >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          python3 - <<'PY'
           import csv, glob, os
           import xml.etree.ElementTree as ET
 
-          print("## Tests ajoutés pour la tâche 2")
-          print()
-          print("| Classe de test | Tests | Échecs | Erreurs |")
-          print("|---|---|---|---|")
-          for f in sorted(glob.glob("tika-core/target/surefire-reports/TEST-org.apache.tika.io.EndianUtils*.xml")):
+          resume = []
+
+
+          def annoncer(titre, lignes):
+              # Annotation affichée sur la page de l'exécution (et lisible par l'API « check runs »).
+              message = "\n".join(lignes).replace("%", "%25").replace("\n", "%0A")
+              print(f"::notice title={titre}::{message}")
+
+
+          def pourcentage(n, total, arrondi=round):
+              return f"{arrondi(100 * n / total)} %" if total else "-"
+
+
+          # Tests : les rapports Surefire des classes EndianUtils viennent de la dernière mesure
+          # JaCoCo, les autres de l'exécution complète.
+          resume += ["## Tests de tika-core", "",
+                     "| Classe de test | Tests | Échecs | Erreurs | Ignorés |", "|---|---|---|---|---|"]
+          total = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+          tests_endian = 0
+          for f in sorted(glob.glob("tika-core/target/surefire-reports/TEST-*.xml")):
               s = ET.parse(f).getroot()
-              print(f"| {s.get('name').rsplit('.', 1)[-1]} | {s.get('tests')} | {s.get('failures')} | {s.get('errors')} |")
+              for k in total:
+                  total[k] += int(s.get(k, "0"))
+              if s.get("name").startswith("org.apache.tika.io.EndianUtils"):
+                  tests_endian += int(s.get("tests"))
+                  resume.append(f"| {s.get('name').rsplit('.', 1)[-1]} | {s.get('tests')} | {s.get('failures')} |"
+                                f" {s.get('errors')} | {s.get('skipped')} |")
+          bilan = (f"{total['tests']} tests dans tika-core, dont {tests_endian} pour EndianUtils :"
+                   f" {total['failures']} échecs, {total['errors']} erreurs, {total['skipped']} ignorés")
+          resume += ["", bilan + "."]
+          annoncer("Tests", [bilan])
 
-          jacoco = "tika-core/target/site/jacoco/jacoco.csv"
-          if os.path.exists(jacoco):
-              for r in csv.DictReader(open(jacoco)):
-                  if r["CLASS"] == "EndianUtils":
-                      lignes = int(r["LINE_COVERED"]) + int(r["LINE_MISSED"])
-                      branches = int(r["BRANCH_COVERED"]) + int(r["BRANCH_MISSED"])
-                      print()
-                      print(f"Couverture JaCoCo d'EndianUtils avec tous les tests : {r['LINE_COVERED']}/{lignes} lignes,"
-                            f" {r['BRANCH_COVERED']}/{branches} branches.")
+          resume += ["", "## Couverture JaCoCo d'EndianUtils", "",
+                     "| Suite de tests | Instructions | Branches | Lignes | Méthodes |", "|---|---|---|---|---|"]
+          notes = []
+          if os.path.exists("rapports/couverture-jacoco.csv"):
+              for r in csv.DictReader(open("rapports/couverture-jacoco.csv")):
+                  cellules = []
+                  for k in ("instructions", "branches", "lignes", "methodes"):
+                      n, t = int(r[k + "_couvertes"]), int(r[k])
+                      # JaCoCo arrondit à l'entier inférieur : 100 % veut dire tout couvert.
+                      cellules.append(f"{n}/{t} ({pourcentage(n, t, int)})")
+                  resume.append(f"| {r['mesure']} | " + " | ".join(cellules) + " |")
+                  notes.append(f"{r['mesure']} : instructions {cellules[0]}, branches {cellules[1]},"
+                               f" lignes {cellules[2]}, méthodes {cellules[3]}")
+          annoncer("Couverture JaCoCo d'EndianUtils", notes)
 
-          print()
-          print("## Analyse de mutation d'EndianUtils (PIT)")
-          print()
-          print("| Exécution | Tués | Survivants | Non couverts | Score de mutation | Force des tests |")
-          print("|---|---|---|---|---|---|")
-          survivants = []
+          resume += ["", "## Analyse de mutation d'EndianUtils (PIT)", "",
+                     "| Suite de tests | Tués | Survivants | Non couverts | Score de mutation | Force des tests |",
+                     "|---|---|---|---|---|---|"]
+          notes, survivants = [], []
           for d in sorted(glob.glob("rapports/pit-*")):
               f = os.path.join(d, "mutations.xml")
               if not os.path.exists(f):
@@ -117,23 +176,34 @@ jobs:
               tues = sum(m.get("detected") == "true" for m in ms)
               non_couverts = sum(m.get("status") == "NO_COVERAGE" for m in ms)
               survivants = [m for m in ms if m.get("status") == "SURVIVED"]
-              couverts = len(ms) - non_couverts
-              force = f"{100 * tues / couverts:.0f} %" if couverts else "-"
-              print(f"| {os.path.basename(d)} | {tues} | {len(survivants)} | {non_couverts} |"
-                    f" {100 * tues / len(ms):.0f} % ({tues}/{len(ms)}) | {force} |")
-          print()
-          print("Mutants qui survivent à la dernière exécution :")
-          print()
-          for m in survivants:
-              print(f"- ligne {m.findtext('lineNumber')}, `{m.findtext('mutatedMethod')}` : {m.findtext('description')}")
+              score = f"{pourcentage(tues, len(ms))} ({tues}/{len(ms)})"
+              force = pourcentage(tues, len(ms) - non_couverts)
+              resume.append(f"| {os.path.basename(d)} | {tues} | {len(survivants)} | {non_couverts} | {score} | {force} |")
+              notes.append(f"{os.path.basename(d)} : {tues} tués, {len(survivants)} survivants,"
+                           f" {non_couverts} non couverts ; score {score}, force {force}")
+          annoncer("Mutation PIT d'EndianUtils", notes)
+
+          details = [f"ligne {m.findtext('lineNumber')}, {m.findtext('mutatedMethod')} : {m.findtext('description')}"
+                     for m in survivants]
+          resume += ["", "Mutants qui survivent à la dernière exécution :", ""] + [f"- {d}" for d in details]
+          annoncer("Survivants de la dernière exécution PIT", details or ["aucun"])
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as sortie:
+              sortie.write("\n".join(resume) + "\n")
           PY
 
-      - name: Téléverser les rapports
+      - name: Téléverser les rapports (à copier dans le dossier tache2/ du dépôt)
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: tache2-rapports
+          path: rapports/
+
+      - name: Téléverser les traces (rapports Surefire et JaCoCo complets)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: tache2-traces
           path: |
-            rapports/
             tika-core/target/surefire-reports/TEST-org.apache.tika.io.EndianUtils*.xml
             tika-core/target/site/jacoco/
