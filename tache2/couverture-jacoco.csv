@@ -1,0 +1,5 @@
+mesure,instructions_couvertes,instructions,branches_couvertes,branches,lignes_couvertes,lignes,methodes_couvertes,methodes
+1-tests-originaux,158,685,10,28,31,121,4,32
+2-avec-tests-generes,337,685,10,28,60,121,17,32
+3-avec-tests-manuels,341,685,12,28,61,121,17,32
+4-avec-tests-de-couverture,682,685,28,28,120,121,31,32

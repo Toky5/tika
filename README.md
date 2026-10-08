@@ -14,10 +14,11 @@ Ce dépôt est une copie (fork) d'[Apache Tika](https://github.com/apache/tika).
 8. [Analyse de mutation avec PIT](#8-analyse-de-mutation-avec-pit)
 9. [Mutants détectés grâce aux tests générés](#9-mutants-détectés-grâce-aux-tests-générés)
 10. [Mutants qui survivent aux tests générés](#10-mutants-qui-survivent-aux-tests-générés)
-11. [Tests écrits à la main](#11-tests-écrits-à-la-main)
-12. [Mutants encore vivants](#12-mutants-encore-vivants)
-13. [Exécution dans GitHub Actions](#13-exécution-dans-github-actions)
-14. [Déclaration d'utilisation de l'IA](#14-déclaration-dutilisation-de-lia)
+11. [Tests écrits à la main pour les mutants survivants](#11-tests-écrits-à-la-main-pour-les-mutants-survivants)
+12. [Tests écrits à la main pour le code non couvert](#12-tests-écrits-à-la-main-pour-le-code-non-couvert)
+13. [Mutants encore vivants](#13-mutants-encore-vivants)
+14. [Exécution dans GitHub Actions](#14-exécution-dans-github-actions)
+15. [Déclaration d'utilisation de l'IA](#15-déclaration-dutilisation-de-lia)
 
 ---
 
@@ -25,13 +26,14 @@ Ce dépôt est une copie (fork) d'[Apache Tika](https://github.com/apache/tika).
 
 La classe étudiée est **`org.apache.tika.io.EndianUtils`**, du module **`tika-core`**. Elle lit des entiers en little-endian (LE), en big-endian (BE) ou en « middle-endian », depuis un flux (méthodes `read*`) ou depuis un tableau d'octets (méthodes `get*`).
 
-Les tests ont été générés par **ChatUniTest 2.1.1**, branché dans le build Maven, avec un LLM ouvert exécuté localement : **CodeQwen1.5-7B-Chat**, servi par **Ollama**. Leur effet a été mesuré avec **PIT 1.30.0**, puis des tests ont été écrits à la main pour les mutants qui survivaient.
+Les tests ont été générés par **ChatUniTest 2.1.1**, branché dans le build Maven, avec un LLM ouvert exécuté localement : **CodeQwen1.5-7B-Chat**, servi par **Ollama**. Leur effet a été mesuré avec **PIT 1.30.0** et **JaCoCo**. Des tests ont ensuite été écrits à la main, en deux temps : pour les mutants qui survivaient, puis pour le code qu'aucun test n'exécutait.
 
-| Suite de tests | Tests d'`EndianUtils` | Mutants tués | Survivants | Non couverts | Score de mutation | Force des tests |
-|---|---|---|---|---|---|---|
-| Tests d'origine (`EndianUtilsTest`) | 4 | 38 | 14 | 155 | 18 % (38/207) | 73 % |
-| + tests générés par ChatUniTest | 4 + 22 | 86 | 21 | 100 | 42 % (86/207) | 80 % |
-| + tests écrits à la main | 4 + 22 + 6 | 105 | 2 | 100 | 51 % (105/207) | 98 % |
+| Suite de tests | Tests d'`EndianUtils` | Mutants tués | Survivants | Non couverts | Score de mutation | Force des tests | Lignes couvertes (JaCoCo) |
+|---|---|---|---|---|---|---|---|
+| 1. Tests d'origine (`EndianUtilsTest`) | 4 | 38 | 14 | 154 | 18 % (38/206) | 73 % | 31 / 121 |
+| 2. + tests générés par ChatUniTest | 4 + 22 | 86 | 21 | 99 | 42 % (86/206) | 80 % | 60 / 121 |
+| 3. + tests écrits à la main pour les survivants | 4 + 22 + 5 | 105 | 2 | 99 | 51 % (105/206) | 98 % | 61 / 121 |
+| 4. + tests écrits à la main pour le code non couvert | 4 + 22 + 5 + 6 | 204 | 2 | 0 | 99 % (204/206) | 99 % | 120 / 121 |
 
 Le *score de mutation* rapporte les mutants tués au total des mutants ; la *force des tests* les rapporte aux seuls mutants exécutés par au moins un test.
 
@@ -40,7 +42,9 @@ Points principaux :
 - ChatUniTest a produit un test pour **12 des 31 méthodes**. Il a échoué sur **les 12 méthodes `read*`**, surtout parce que le modèle ne savait ni importer ni déclarer l'exception interne `EndianUtils.BufferUnderrunException` (11 cas sur 12).
 - Aucun test généré ne passait tel quel le build de Tika (règles Checkstyle). Après des corrections de forme automatiques, **16 méthodes de test sur 22 passaient** ; les **6 autres** ont demandé une correction d'une ligne chacune, dont 3 oracles faux.
 - ChatUniTest a pourtant présenté ces 6 tests en échec comme réussis : il accepte un test dont une assertion échoue.
-- Les tests générés tuent **48 mutants de plus** ; les **6 tests écrits à la main** tuent les **19 survivants qui pouvaient l'être**. Les 2 derniers survivants sont des mutants équivalents.
+- Les tests générés tuent **48 mutants de plus**. **5 tests écrits à la main** tuent ensuite les **19 survivants qui pouvaient l'être**, et **6 autres** tuent les **99 mutants qu'aucun test n'exécutait**. Les 2 derniers survivants sont des mutants équivalents.
+- Chacun de ces 11 tests est le seul à tuer certains mutants ou à couvrir certaines lignes ou branches : les tests redondants ont été retirés (section 12).
+- Avec toutes les suites, JaCoCo couvre **toutes les branches (28/28)** et **120 des 121 lignes** d'`EndianUtils`. La ligne restante est le constructeur implicite d'une classe dont toutes les méthodes sont statiques.
 
 ## 2. Organisation du dépôt et reproduction
 
@@ -49,33 +53,42 @@ Points principaux :
 | [`tika-core/pom.xml`](tika-core/pom.xml) | Configuration de PIT et de ChatUniTest, et dépendances de test (blocs « Tâche 2 ») |
 | [`tika-core/chatunitest-tests/tika-parent/tika-core/org/apache/tika/io/`](tika-core/chatunitest-tests/tika-parent/tika-core/org/apache/tika/io/) | Les 12 tests **bruts**, tels que ChatUniTest les a écrits |
 | [`tika-core/src/test/java/org/apache/tika/io/EndianUtils_*_Test.java`](tika-core/src/test/java/org/apache/tika/io/) | Les mêmes tests, **intégrés** à la suite de Tika et corrigés (section 6) |
-| [`tika-core/src/test/java/org/apache/tika/io/EndianUtilsMutationTest.java`](tika-core/src/test/java/org/apache/tika/io/EndianUtilsMutationTest.java) | Les tests écrits à la main (section 11) |
+| [`tika-core/src/test/java/org/apache/tika/io/EndianUtilsMutationTest.java`](tika-core/src/test/java/org/apache/tika/io/EndianUtilsMutationTest.java) | Les tests écrits à la main pour les mutants survivants (section 11) |
+| [`tika-core/src/test/java/org/apache/tika/io/EndianUtilsCouvertureTest.java`](tika-core/src/test/java/org/apache/tika/io/EndianUtilsCouvertureTest.java) | Les tests écrits à la main pour le code non couvert (section 12) |
 | [`tache2/chatunitest-EndianUtils.log`](tache2/chatunitest-EndianUtils.log) | Journal complet de la génération |
 | [`tache2/chatunitest-info/`](tache2/chatunitest-info/) | Pour chaque tentative : demande envoyée au modèle, réponse, code extrait et erreurs (`history…/…/records.json`, `error-message/`) |
-| [`tache2/pit-1-tests-originaux/`](tache2/pit-1-tests-originaux/), [`pit-2-avec-tests-generes/`](tache2/pit-2-avec-tests-generes/), [`pit-3-avec-tests-manuels/`](tache2/pit-3-avec-tests-manuels/) | Rapports PIT (HTML et XML) des trois mesures du tableau ci-dessus |
-| [`.github/workflows/tache2.yml`](.github/workflows/tache2.yml) | GitHub Action qui exécute les tests et les trois analyses PIT (section 13) |
+| [`tache2/pit-1-tests-originaux/`](tache2/pit-1-tests-originaux/), [`pit-2-avec-tests-generes/`](tache2/pit-2-avec-tests-generes/), [`pit-3-avec-tests-manuels/`](tache2/pit-3-avec-tests-manuels/), [`pit-4-avec-tests-de-couverture/`](tache2/pit-4-avec-tests-de-couverture/) | Rapports PIT (HTML et XML) des quatre mesures du tableau ci-dessus |
+| [`tache2/jacoco-1-tests-originaux/`](tache2/jacoco-1-tests-originaux/index.html), [`jacoco-2-avec-tests-generes/`](tache2/jacoco-2-avec-tests-generes/index.html), [`jacoco-3-avec-tests-manuels/`](tache2/jacoco-3-avec-tests-manuels/index.html), [`jacoco-4-avec-tests-de-couverture/`](tache2/jacoco-4-avec-tests-de-couverture/index.html) | Rapports JaCoCo (HTML) d'`EndianUtils` des quatre mesures : le code source, avec les lignes couvertes en vert, partiellement couvertes en jaune et non couvertes en rouge |
+| [`tache2/couverture-jacoco.csv`](tache2/couverture-jacoco.csv) | Les chiffres de couverture JaCoCo d'`EndianUtils` des quatre mesures |
+| [`.github/workflows/tache2.yml`](.github/workflows/tache2.yml) | GitHub Action qui exécute les tests, puis produit les rapports PIT et la couverture JaCoCo des quatre mesures (section 14) |
+
+Sur GitHub, un fichier HTML s'affiche sous forme de code : pour voir les rapports PIT et JaCoCo, il faut cloner le dépôt (ou télécharger son archive) et ouvrir les fichiers `index.html` dans un navigateur.
 
 Commandes, depuis la racine du dépôt (sous Linux ou macOS, remplacer `.\mvnw.cmd` par `./mvnw`) :
 
 ```
-:: Compiler tika-core et exécuter tous ses tests (777 tests dans tika-core)
+:: Compiler tika-core et exécuter tous ses tests
 .\mvnw.cmd -pl tika-core -am install
 
-:: Analyse de mutation avec tous les tests (mesure 3 ; rapport : tika-core\target\pit-reports\index.html)
+:: Analyse de mutation avec tous les tests (mesure 4 ; rapport : tika-core\target\pit-reports\index.html) ;
+:: ajouter -DfullMutationMatrix=true pour que mutations.xml liste tous les tests qui tuent chaque mutant
 .\mvnw.cmd -pl tika-core org.pitest:pitest-maven:mutationCoverage
 
-:: Mesure 1 (tests d'origine seulement) : exclure les tests ajoutés
-.\mvnw.cmd -pl tika-core org.pitest:pitest-maven:mutationCoverage -DexcludedTestClasses=org.apache.tika.io.EndianUtils_*_Test,org.apache.tika.io.EndianUtilsMutationTest
+:: Mesures 1, 2 et 3 : exclure les tests ajoutés après la mesure voulue
+.\mvnw.cmd -pl tika-core org.pitest:pitest-maven:mutationCoverage -DexcludedTestClasses=org.apache.tika.io.EndianUtils_*_Test,org.apache.tika.io.EndianUtilsMutationTest,org.apache.tika.io.EndianUtilsCouvertureTest
+.\mvnw.cmd -pl tika-core org.pitest:pitest-maven:mutationCoverage -DexcludedTestClasses=org.apache.tika.io.EndianUtilsMutationTest,org.apache.tika.io.EndianUtilsCouvertureTest
+.\mvnw.cmd -pl tika-core org.pitest:pitest-maven:mutationCoverage -DexcludedTestClasses=org.apache.tika.io.EndianUtilsCouvertureTest
 
-:: Mesure 2 (tests d'origine et tests générés) : exclure les tests écrits à la main
-.\mvnw.cmd -pl tika-core org.pitest:pitest-maven:mutationCoverage -DexcludedTestClasses=org.apache.tika.io.EndianUtilsMutationTest
+:: Couverture JaCoCo de la mesure 1 (rapport : tika-core\target\site\jacoco\index.html) ;
+:: pour les mesures suivantes, ajouter à -Dtest EndianUtils_*_Test, puis EndianUtilsMutationTest, puis EndianUtilsCouvertureTest
+.\mvnw.cmd -pl tika-core test -Djacoco.append=false -Dtest=EndianUtilsTest
 
 :: Régénérer les tests (Ollama démarré ; environ 4 heures sur un ordinateur portable)
 ollama pull codeqwen:v1.5-chat
 .\mvnw.cmd -pl tika-core chatunitest:class -DselectClass=EndianUtils
 ```
 
-Environnement utilisé : Windows, JDK 17 (Temurin 17.0.20.1), Maven 3.9.12 (via le Maven Wrapper du projet), Ollama avec `codeqwen:v1.5-chat`.
+Environnement utilisé : Windows, JDK 17 (Temurin 17.0.20.1), Maven 3.9.12 (via le Maven Wrapper du projet), Ollama avec `codeqwen:v1.5-chat`. Les rapports PIT et la couverture JaCoCo du dossier `tache2/` viennent de la GitHub Action (Ubuntu, JDK 17 Temurin, section 14).
 
 ## 3. Choix de la classe
 
@@ -87,7 +100,9 @@ L'énoncé demande une classe des modules étudiés, qui a déjà des tests mais
 | Couverture JaCoCo des branches | 35 % |
 | Lignes couvertes (JaCoCo) | 31 / 121 |
 | Méthodes couvertes (JaCoCo) | 4 / 32 |
-| Mutants PIT : tués / survivants / non couverts | 38 / 14 / 155 (sur 207) |
+| Mutants PIT : tués / survivants / non couverts | 38 / 14 / 154 (sur 206) |
+
+Le rapport JaCoCo de cette mesure, [`tache2/jacoco-1-tests-originaux`](tache2/jacoco-1-tests-originaux/org.apache.tika.io/EndianUtils.java.html), montre en rouge les 90 lignes qu'aucun test d'origine n'exécute, et le rapport PIT correspondant, [`tache2/pit-1-tests-originaux`](tache2/pit-1-tests-originaux/index.html), les mutants vivants.
 
 Pourquoi cette classe :
 
@@ -266,7 +281,7 @@ En résumé, **aucun test n'a été intégrable sans intervention**. Les 12 fich
 
 ## 7. Oracles : tests générés et tests écrits à la main
 
-Les tests écrits à la main sont ceux d'origine, `EndianUtilsTest`, écrits par les développeurs de Tika.
+Dans cette section, les tests écrits à la main sont ceux d'origine, `EndianUtilsTest`, écrits par les développeurs de Tika. Les tests que nous avons écrits sont décrits aux sections 11 et 12.
 
 | | Tests écrits à la main | Tests générés par ChatUniTest |
 |---|---|---|
@@ -324,35 +339,54 @@ Ce qu'on en retient :
 
 ### 8.2 Résultats
 
-| Mesure | Rapport | Lignes couvertes (PIT) | Tués | Survivants | Non couverts | Score | Force des tests |
-|---|---|---|---|---|---|---|---|
-| 1. Tests d'origine | [`pit-1-tests-originaux`](tache2/pit-1-tests-originaux/index.html) | 32 / 126 | 38 | 14 | 155 | 18 % | 73 % |
-| 2. + tests générés | [`pit-2-avec-tests-generes`](tache2/pit-2-avec-tests-generes/index.html) | 61 / 126 | 86 | 21 | 100 | 42 % | 80 % |
-| 3. + tests écrits à la main | [`pit-3-avec-tests-manuels`](tache2/pit-3-avec-tests-manuels/index.html) | 62 / 126 | 105 | 2 | 100 | 51 % | 98 % |
+| Mesure | Rapport | Tués | Survivants | Non couverts | Score | Force des tests |
+|---|---|---|---|---|---|---|
+| 1. Tests d'origine | [`pit-1-tests-originaux`](tache2/pit-1-tests-originaux/index.html) | 38 | 14 | 154 | 18 % | 73 % |
+| 2. + tests générés | [`pit-2-avec-tests-generes`](tache2/pit-2-avec-tests-generes/index.html) | 86 | 21 | 99 | 42 % | 80 % |
+| 3. + tests écrits à la main pour les survivants | [`pit-3-avec-tests-manuels`](tache2/pit-3-avec-tests-manuels/index.html) | 105 | 2 | 99 | 51 % | 98 % |
+| 4. + tests écrits à la main pour le code non couvert | [`pit-4-avec-tests-de-couverture`](tache2/pit-4-avec-tests-de-couverture/index.html) | 204 | 2 | 0 | 99 % | 99 % |
 
-Entre les mesures 1 et 2, 48 mutants non couverts deviennent tués et 7 deviennent survivants. Entre les mesures 2 et 3, 19 survivants deviennent tués.
+Entre les mesures 1 et 2, 48 mutants non couverts deviennent tués et 7 deviennent survivants. Entre les mesures 2 et 3, 19 survivants deviennent tués. Entre les mesures 3 et 4, les 99 mutants non couverts deviennent tués.
+
+Ces chiffres et les rapports de `tache2/` viennent de la GitHub Action (section 14), où Maven compile avec javac. Le compilateur compte, car PIT modifie le bytecode et non le code source. Les premières mesures avaient été faites sur des classes compilées par l'extension Java de VS Code, qui utilise le compilateur d'Eclipse : PIT y trouvait 207 mutants. Le mutant en plus était `j--` changé en `j++` dans la boucle de `getLongLE`. Sur le bytecode de javac, PIT reconnaît la boucle `for` et ne crée pas ce mutant, qui pourrait la rendre infinie.
+
+### 8.3 Couverture JaCoCo
+
+JaCoCo, déjà configuré dans Tika, mesure la couverture des mêmes suites de tests (commande à la section 2). Résultats pour `EndianUtils`, d'après [`tache2/couverture-jacoco.csv`](tache2/couverture-jacoco.csv). Chaque rapport HTML montre le code source d'`EndianUtils`, avec les lignes couvertes en vert, partiellement couvertes en jaune (une partie des branches seulement) et non couvertes en rouge. La ligne « Total » d'un rapport HTML compte aussi la classe interne `BufferUnderrunException` (4 instructions, toujours couvertes) ; le tableau ci-dessous ne compte que `EndianUtils`.
+
+| Mesure | Rapport | Instructions | Branches | Lignes | Méthodes |
+|---|---|---|---|---|---|
+| 1. Tests d'origine | [`jacoco-1-tests-originaux`](tache2/jacoco-1-tests-originaux/index.html) | 158 / 685 (23 %) | 10 / 28 (35 %) | 31 / 121 | 4 / 32 |
+| 2. + tests générés | [`jacoco-2-avec-tests-generes`](tache2/jacoco-2-avec-tests-generes/index.html) | 337 / 685 (49 %) | 10 / 28 (35 %) | 60 / 121 | 17 / 32 |
+| 3. + tests écrits à la main pour les survivants | [`jacoco-3-avec-tests-manuels`](tache2/jacoco-3-avec-tests-manuels/index.html) | 341 / 685 (49 %) | 12 / 28 (42 %) | 61 / 121 | 17 / 32 |
+| 4. + tests écrits à la main pour le code non couvert | [`jacoco-4-avec-tests-de-couverture`](tache2/jacoco-4-avec-tests-de-couverture/index.html) | 682 / 685 (99 %) | 28 / 28 (100 %) | 120 / 121 | 31 / 32 |
+
+Deux remarques :
+
+- **Les tests générés n'ajoutent aucune branche.** Les méthodes qu'ils testent (`get*`, `ubyteToInt`, `getUByte`) ne contiennent aucune condition : toutes les branches d'`EndianUtils` sont dans les méthodes `read*` et dans la boucle de `getLongLE`.
+- **La couverture ne dit pas si les vérifications sont fortes.** La mesure 3 n'ajoute qu'une ligne et deux branches, mais tue 19 mutants de plus : ses tests passent surtout par du code déjà exécuté, avec des données et des oracles plus exigeants.
 
 ## 9. Mutants détectés grâce aux tests générés
 
-Les 48 mutants que les tests générés tuent en plus étaient tous **non couverts** auparavant : aucun test d'origine n'appelait ces méthodes. PIT attribue chaque mutant au premier test qui le tue ; d'autres tests peuvent aussi le tuer.
+Les 48 mutants que les tests générés tuent en plus étaient tous **non couverts** auparavant : aucun test d'origine n'appelait ces méthodes. La colonne « Tués par » donne tous les tests générés qui tuent ces mutants, d'après la matrice complète de PIT (section 12).
 
-| Méthode | Lignes | Mutants tués | Tué par | Pourquoi |
+| Méthode | Lignes | Mutants tués | Tués par | Pourquoi |
 |---|---|---|---|---|
 | `getShortLE(byte[], int)` | 270 | Valeur de retour remplacée par 0 (1) | `getShortLE_13` | Le test attend `0x3412`. |
-| `getUShortLE(byte[], int)` | 291–293 | Masques `& 0xFF` changés en `\| 0xFF` (2), `offset + 1` changé en `offset - 1`, décalage `<<` changé en `>>`, addition changée en soustraction, retour 0 (6) | `getShortLE_13`, par délégation | Avec les octets `0x12` et `0x34`, tous deux non nuls, chaque opération compte dans le résultat. |
+| `getUShortLE(byte[], int)` | 291–293 | Masques `& 0xFF` changés en `\| 0xFF` (2), `offset + 1` changé en `offset - 1`, décalage `<<` changé en `>>`, addition changée en soustraction, retour 0 (6) | `getUShortLE_14`, `getUShortLE_15`, `getShortLE_13` (par délégation) | Avec les octets `0x12` et `0x34` de `getShortLE_13`, tous deux non nuls, chaque opération compte dans le résultat. |
 | `getShortBE(byte[])` | 303 | Retour 0 (1) | `getShortBE_16` | Le test attend 1. |
-| `getShortBE(byte[], int)` | 314 | Retour 0 (1) | `getShortBE_17` | Le test attend -1 pour `{0xFF, 0xFF}`. |
+| `getShortBE(byte[], int)` | 314 | Retour 0 (1) | `getShortBE_17`, `getShortBE_16` (par délégation) | `getShortBE_17` attend -1 pour `{0xFF, 0xFF}`. |
 | `getUShortBE(byte[])` | 324 | Retour 0 (1) | `getUShortBE_18` | Le test attend `0x1234`. |
-| `getUShortBE(byte[], int)` | 335–337 | Mêmes 6 mutants que `getUShortLE` (6) | `getUShortBE_18` | Même raison, avec `{0x12, 0x34}`. |
+| `getUShortBE(byte[], int)` | 335–337 | Mêmes 6 mutants que `getUShortLE` (6) | `getUShortBE_18`, `getUShortBE_19`, `getShortBE_17` et, pour 5 d'entre eux, `getShortBE_16` | Même raison, par exemple avec `{0x12, 0x34}` dans `getUShortBE_18`. |
 | `getIntLE(byte[], int)` | 359–363 | `i++` changé en `i--` sur les 3 premières lectures, masques (4), décalage de l'octet de poids fort, retour 0 (9) | `getUIntLE_25` (oracle corrigé) | Décaler la position de lecture ou remplacer un masque change l'octet lu ; `1 << 24` devient 0 avec `>>`. |
 | `getIntBE(byte[])` | 373 | Retour 0 (1) | `getIntBE_22` | |
-| `getIntBE(byte[], int)` | 385–389 | `i++` (3), masques (4), décalages (3), additions (3), retour 0 (14) | `getUIntBE_27`, `getIntBE_22` | `getIntBE_22` place un 1 à chaque position tour à tour : chaque décalage et chaque addition compte. |
+| `getIntBE(byte[], int)` | 385–389 | `i++` (3), masques (4), décalages (3), additions (3), retour 0 (14) | `getIntBE_22` (les 14), `getUIntBE_27` (9) | `getIntBE_22` place un 1 à chaque position tour à tour : chaque décalage et chaque addition compte. |
 | `getUIntLE(byte[], int)` | 411 | Masque `0xFFFFFFFF` changé en OU, retour 0 (2) | `getUIntLE_25` (oracle corrigé) | Le OU avec `0xFFFFFFFF` donne `0xFFFFFFFF` au lieu de `0x01000000`. |
 | `getUIntBE(byte[], int)` | 433 | Mêmes 2 mutants (2) | `getUIntBE_27` | |
 | `ubyteToInt(byte)` | 461 | `& 0xFF` changé en `\| 0xFF`, retour 0 (2) | `ubyteToInt_29` (oracle corrigé) | `0x12 \| 0xFF` vaut `0xFF` et non `0x12`. |
 | `getUByte(byte[], int)` | 472 | Mêmes 2 mutants (2) | `getUByte_30` | Le test attend 3. |
 
-14 de ces 48 mutants sont tués par des tests dont l'oracle a été corrigé à la main : `getUIntLE_25` (11), `ubyteToInt_29` (2) et `getShortBE_16` (1). Sans correction, ces tests échouaient sur le code d'origine, et PIT ne pouvait pas s'en servir.
+14 de ces 48 mutants ne sont tués que par des tests corrigés à la main (section 6.4) : `getUIntLE_25` (11), `ubyteToInt_29` (2) et `getShortBE_16` (1). Sans correction, ces tests échouaient sur le code d'origine, et PIT ne pouvait pas s'en servir.
 
 ## 10. Mutants qui survivent aux tests générés
 
@@ -366,11 +400,11 @@ Après l'ajout des tests générés, 21 mutants survivent : les 14 des tests d'o
 | `readUE7` (235) | `>= 0` changé en `> 0` ; `read++ < max` changé en `<=` ; `read++` changé en `read--` | Aucun test ne contient d'octet `0x00`, ni de valeur codée sur plus de 6 octets. |
 | `readUE7` (246) | `i < 0` changé en `i <= 0` | Aucun test ne se termine par un octet `0x00`. |
 | `getIntLE` (363) | 2 décalages, 3 additions | Seul le test de `getUIntLE` appelle cette méthode, avec `{0, 0, 0, 1}` : décaler ou soustraire un octet nul ne change rien. |
-| `getIntLE` (362), `getIntBE` (388) | Dernier `i++` changé en `i--` | Mutants équivalents (section 12). |
+| `getIntLE` (362), `getIntBE` (388) | Dernier `i++` changé en `i--` | Mutants équivalents (section 13). |
 
-## 11. Tests écrits à la main
+## 11. Tests écrits à la main pour les mutants survivants
 
-Les 6 tests sont dans [`EndianUtilsMutationTest.java`](tika-core/src/test/java/org/apache/tika/io/EndianUtilsMutationTest.java). Deux méthodes utilitaires construisent les données : `flux(...)` donne un flux qui contient exactement les octets indiqués ; `fluxScripte(...)` donne un flux qui renvoie les valeurs indiquées telles quelles, -1 compris, puis -1.
+Les 5 tests sont dans [`EndianUtilsMutationTest.java`](tika-core/src/test/java/org/apache/tika/io/EndianUtilsMutationTest.java). Deux méthodes utilitaires construisent les données : `flux(...)` donne un flux qui contient exactement les octets indiqués ; `fluxScripte(...)` donne un flux qui renvoie les valeurs indiquées telles quelles, -1 compris, puis -1.
 
 ### `quatreOctetsNulsNeSontPasUneFinDeFlux`
 - **Intention** : un octet de valeur 0 ne doit pas être pris pour une fin de flux.
@@ -378,17 +412,11 @@ Les 6 tests sont dans [`EndianUtilsMutationTest.java`](tika-core/src/test/java/o
 - **Oracle** : la valeur 0, sans exception.
 - **Mutants tués** : `< 0` changé en `<= 0` aux lignes 92, 111 et 168 (3).
 
-### `readUIntBESurUnFluxTropCourtLeveUneException`
-- **Intention** : vérifier le cas que le test d'origine voulait couvrir, mais qu'il appliquait par erreur à `readUIntLE`.
-- **Données** : trois octets `0xFF` ; il en manque un pour former un entier de 4 octets.
-- **Oracle** : `BufferUnderrunException`, l'exception que la méthode documente pour un flux trop court.
-- **Mutants tués** : le dernier OU changé en ET à la ligne 111 (1).
-
 ### `uneFinDeFluxSuivieDOctetsEstDetectee`
-- **Intention** : chacune des quatre lectures doit être vérifiée, et pas seulement la dernière.
+- **Intention** : chacune des quatre lectures doit être vérifiée, et pas seulement la dernière. Pour `readUIntBE`, c'est aussi le cas du flux trop court que le test d'origine voulait vérifier, mais qu'il appliquait par erreur à `readUIntLE` (section 3).
 - **Données** : un flux qui renvoie -1, puis 1, 2 et 3. Seule la première lecture échoue, comme sur une console après Ctrl-Z, dont la fin n'est pas définitive. Avec un flux ordinaire, toutes les lectures suivantes renverraient aussi -1, et la dernière suffirait à révéler la fin du flux.
-- **Oracle** : `BufferUnderrunException` pour `readUIntLE`, `readUIntBE` et `readIntME`.
-- **Mutants tués** : les deux premiers OU changés en ET aux lignes 92, 111 et 168 (6).
+- **Oracle** : `BufferUnderrunException` pour `readUIntLE`, `readUIntBE` et `readIntME`, l'exception que ces méthodes documentent pour un flux trop court.
+- **Mutants tués** : les deux premiers OU changés en ET aux lignes 92 et 168, et les trois OU de la ligne 111 (7). Avec un ET, le -1 est combiné à un octet valide : `-1 & 1` vaut 1, et le résultat n'est plus négatif. Le troisième OU des lignes 92 et 168 était déjà tué par les tests d'origine.
 
 ### `readUE7AccepteUnDernierGroupeNul`
 - **Intention** : un dernier groupe de valeur 0 est valide.
@@ -408,43 +436,113 @@ Les 6 tests sont dans [`EndianUtilsMutationTest.java`](tika-core/src/test/java/o
 - **Oracle** : `0x04030201` ; en little-endian, le dernier octet est celui de poids fort.
 - **Mutants tués** : 2 décalages et 3 additions à la ligne 363 (5).
 
-PIT confirme que chaque test tue exactement les mutants visés : 19 au total.
+PIT le confirme : à la mesure 3, les 19 survivants qui n'étaient pas équivalents sont tués.
 
-## 12. Mutants encore vivants
+## 12. Tests écrits à la main pour le code non couvert
 
-**2 mutants survivent, et ils sont équivalents.** Aux lignes 362 (`getIntLE`) et 388 (`getIntBE`), PIT change le dernier `i++` de `int b3 = data[i++] & 0xFF;` en `i--`. L'octet lu reste `data[i]`, puisque l'incrément a lieu après la lecture, et `i` n'est plus jamais lu ensuite. Le comportement de la méthode est donc identique : aucun test ne peut tuer ces mutants.
+Après la mesure 3, **99 mutants n'étaient exécutés par aucun test**. Ils se trouvent dans 14 méthodes que ni les tests d'origine, ni les tests générés, ni ceux de la section 11 n'appelaient. Ce sont surtout les méthodes `read*` où ChatUniTest a échoué (section 5.3) :
 
-**100 mutants ne sont exécutés par aucun test.** Ils se trouvent dans des méthodes qu'aucune des trois suites n'appelle :
-
-| Méthodes | Mutants |
+| Méthodes | Mutants non couverts |
 |---|---|
 | `readShortLE`, `readShortBE` | 1 + 1 |
 | `readUShortLE`, `readUShortBE` | 6 + 6 |
 | `readIntLE`, `readIntBE` | 12 + 12 |
 | `readLongLE`, `readLongBE` | 24 + 24 |
-| `getLongLE` | 9 |
+| `getLongLE` | 8 |
 | `getShortLE(byte[])`, `getUShortLE(byte[])`, `getIntLE(byte[])`, `getUIntLE(byte[])`, `getUIntBE(byte[])` | 5 × 1 |
 
-Ce sont pour l'essentiel les méthodes `read*` où ChatUniTest a échoué (section 5.3). Les tests écrits à la main visent les mutants survivants, comme le demande l'énoncé. Ces 100 mutants demanderaient des tests du même type, par exemple la lecture d'octets distincts depuis un flux.
+Les 6 tests de [`EndianUtilsCouvertureTest.java`](tika-core/src/test/java/org/apache/tika/io/EndianUtilsCouvertureTest.java) appellent ces méthodes. Ils reprennent les méthodes utilitaires `flux(...)` et `fluxScripte(...)` de la section 11, et les mêmes principes : des octets distincts et non nuls, pour que chaque opération compte dans le résultat, et des valeurs à la limite des comparaisons.
 
-## 13. Exécution dans GitHub Actions
+### `lectureDOctetsDistinctsDepuisUnFlux`
+- **Intention** : les 8 méthodes de lecture jamais appelées (`readShortLE`, `readShortBE`, `readUShortLE`, `readUShortBE`, `readIntLE`, `readIntBE`, `readLongLE`, `readLongBE`) placent chaque octet à sa place, selon l'ordre LE ou BE.
+- **Données** : les octets 1, 2, 3… Ils sont distincts et non nuls : un décalage dans le mauvais sens, une soustraction à la place d'une addition ou un octet mal placé change forcément le résultat. Avec des octets nuls, comme dans certains tests générés, ces erreurs passent inaperçues (section 7).
+- **Oracle** : la valeur se lit directement en hexadécimal. En LE, le premier octet lu est celui de poids faible : `1, 2` donne `0x0201`. En BE, c'est celui de poids fort : `0x0102`. De même, `1, 2, …, 8` donne `0x0807060504030201` en LE et `0x0102030405060708` en BE.
+- **Mutants tués** : tous les décalages, toutes les additions et toutes les valeurs de retour de ces 8 méthodes (52).
+
+### `octetsNulsLusSansFinDeFlux`
+- **Intention** : un octet de valeur 0 n'est pas une fin de flux. C'est le comportement vérifié par `quatreOctetsNulsNeSontPasUneFinDeFlux` (section 11), ici pour `readUShortLE`, `readUShortBE`, `readIntLE`, `readIntBE`, `readLongLE` et `readLongBE`.
+- **Données** : que des octets nuls. Le OU des octets lus vaut alors exactement 0, la limite entre une lecture valide (≥ 0) et une fin de flux (< 0).
+- **Oracle** : la valeur 0, sans exception.
+- **Mutants tués** : `< 0` changé en `<= 0` aux lignes 64, 73, 130, 149, 191 et 217 (6).
+
+### `finDeFluxDetecteeMemeSiDesOctetsSuivent`
+- **Intention** : chacune des lectures doit être vérifiée, et pas seulement la dernière, comme dans `uneFinDeFluxSuivieDOctetsEstDetectee` (section 11), pour les mêmes 6 méthodes.
+- **Données** : un flux qui renvoie -1, puis des octets valides (1, 2, 3…). Seule la première lecture échoue.
+- **Oracle** : `BufferUnderrunException`, l'exception que ces méthodes déclarent pour un flux qui ne fournit pas assez d'octets.
+- **Mutants tués** : chaque OU changé en ET dans les conditions de fin de flux : 1 + 1 (`readUShort*`), 3 + 3 (`readInt*`) et 7 + 7 (`readLong*`), soit 22. Avec un ET, le -1 est combiné à un octet valide : `-1 & 1` vaut 1, et le résultat n'est plus négatif.
+
+La négation de ces 6 conditions (`< 0` changé en `>= 0`) inverse le test : l'exception est levée sur un flux valide, et ne l'est plus sur un flux tronqué. Ces 6 mutants sont tués par chacun des trois tests précédents.
+
+### `readUE7SignaleUnFluxTronque`
+- **Intention** : `readUE7` doit signaler un flux qui s'arrête au milieu d'une valeur.
+- **Données** : un flux vide, puis un flux qui ne contient que `0x81`. Le bit de poids fort de `0x81` annonce un octet suivant, qui n'arrive jamais.
+- **Oracle** : une `IOException`. La méthode déclare cette exception et la lève avec le message « Buffer underun; expected one more byte » : une valeur incomplète ne doit pas être renvoyée comme si elle était valide.
+- **Mutants tués** : aucun que les autres tests ne tuent déjà. Les 5 mutants qu'il tue, comme la négation de `i < 0` (ligne 246), sont aussi tués par `EndianUtilsTest.testReadUE7`. Il est gardé pour la couverture : il couvre la ligne 247 et les deux branches de fin de flux de `readUE7`, le seul code que JaCoCo signalait encore comme non couvert après la mesure 3, en dehors des méthodes jamais appelées et du constructeur. Vérification faite à la main : si on supprime le test `if (i < 0)`, ce test échoue, et c'est le seul.
+
+### `surchargesSansDecalageLisentDepuisLeDebut`
+- **Intention** : les 5 surcharges sans décalage jamais appelées (`getShortLE(byte[])`, `getUShortLE(byte[])`, `getIntLE(byte[])`, `getUIntLE(byte[])`, `getUIntBE(byte[])`) lisent à partir de l'indice 0.
+- **Données** : `{1, 2, 3, 4}`, quatre octets distincts.
+- **Oracle** : la même valeur qu'avec un décalage de 0 : `0x0201` sur 2 octets en LE, `0x04030201` sur 4 octets en LE, `0x01020304` en BE.
+- **Mutants tués** : la valeur de retour remplacée par 0, dans chacune des 5 surcharges (5). Elles ne font qu'appeler la version avec décalage, déjà testée : c'est leur seul mutant.
+
+### `getLongLEAvecOctetsDistinctsEtDecalage`
+- **Intention** : `getLongLE` assemble 8 octets en little-endian, à partir du décalage donné.
+- **Données** : huit octets distincts `{1, …, 8}`, d'abord au début du tableau, puis précédés de deux octets `0x7F` qui doivent être ignorés (décalage de 2). Le tableau a exactement la taille nécessaire : une lecture en dehors des 8 octets lève une exception.
+- **Oracle** : `0x0807060504030201` dans les deux cas.
+- **Mutants tués** : les 8 mutants de `getLongLE` : les bornes de la boucle (`>=` changé en `>`, condition niée, `offset + LONG_SIZE - 1` changé en `offset - LONG_SIZE - 1` ou en `offset + LONG_SIZE + 1`), le décalage `<<=` changé en `>>=`, le masque `0xff &` changé en `0xff |`, `|=` changé en `&=`, et la valeur de retour (8). PIT ne crée pas de mutant `j--` changé en `j++`, qui pourrait rendre la boucle infinie (section 8.2).
+
+PIT confirme que ces 6 tests tuent les 99 mutants qui n'étaient pas couverts (mesure 4).
+
+### Aucun test écrit à la main n'est redondant
+
+Chaque test écrit à la main doit apporter quelque chose que les autres tests de sa suite n'apportent pas : au moins un mutant qu'il est seul à tuer, ou au moins une ligne ou une branche qu'il est seul à couvrir. Pour le vérifier, chaque test a été retiré tour à tour de sa suite (mesure 3 pour les tests de la section 11, mesure 4 pour ceux de cette section), et on a comparé les mutants tués et la couverture JaCoCo avec et sans lui. Les mutants que chaque test est seul à tuer viennent aussi de la matrice complète de PIT (option `fullMutationMatrix`, qui liste tous les tests qui tuent chaque mutant), dans les rapports `mutations.xml` de `tache2/`.
+
+| Test | Suite | Mutants qu'il est seul à tuer | Couverture qu'il est seul à apporter |
+|---|---|---|---|
+| `quatreOctetsNulsNeSontPasUneFinDeFlux` | mesure 3 | 3 | — |
+| `uneFinDeFluxSuivieDOctetsEstDetectee` | mesure 3 | 7 | 1 ligne, 1 branche |
+| `readUE7AccepteUnDernierGroupeNul` | mesure 3 | 2 | — |
+| `readUE7NeDecodePasPlusDeSixOctets` | mesure 3 | 2 | 1 branche |
+| `getIntLEAvecQuatreOctetsDistinctsNonNuls` | mesure 3 | 5 | — |
+| `lectureDOctetsDistinctsDepuisUnFlux` | mesure 4 | 52 | 2 lignes, 2 méthodes |
+| `octetsNulsLusSansFinDeFlux` | mesure 4 | 6 | — |
+| `finDeFluxDetecteeMemeSiDesOctetsSuivent` | mesure 4 | 22 | 6 lignes, 6 branches |
+| `readUE7SignaleUnFluxTronque` | mesure 4 | — | 1 ligne, 2 branches |
+| `surchargesSansDecalageLisentDepuisLeDebut` | mesure 4 | 5 | 5 lignes, 5 méthodes |
+| `getLongLEAvecOctetsDistinctsEtDecalage` | mesure 4 | 8 | 5 lignes, 2 branches, 1 méthode |
+
+Deux tests ne remplissaient aucune des deux conditions et ont été retirés :
+
+- `readUIntBESurUnFluxTropCourtLeveUneException` lisait trois octets avec `readUIntBE`. `uneFinDeFluxSuivieDOctetsEstDetectee` tue le même mutant et couvre la même ligne.
+- `signeDesValeursLues` vérifiait le signe des valeurs lues par les méthodes `read*`. Tous les mutants qu'il tuait sont aussi tués par `lectureDOctetsDistinctsDepuisUnFlux`, et il ne couvrait rien de plus.
+
+`getIntLEAvecQuatreOctetsDistinctsNonNuls` est conservé, même si, dans la suite complète, ses 5 mutants sont aussi tués par `surchargesSansDecalageLisentDepuisLeDebut`, qui lit les mêmes octets par `getIntLE(byte[])`. À la mesure 3, il est le seul à les tuer.
+
+## 13. Mutants encore vivants
+
+**2 mutants survivent, et ils sont équivalents.** Aux lignes 362 (`getIntLE`) et 388 (`getIntBE`), PIT change le dernier `i++` de `int b3 = data[i++] & 0xFF;` en `i--`. L'octet lu reste `data[i]`, puisque l'incrément a lieu après la lecture, et `i` n'est plus jamais lu ensuite. Le comportement de la méthode est donc identique : aucun test ne peut tuer ces mutants.
+
+**Une seule ligne n'est pas couverte.** Avec les quatre suites, JaCoCo ne signale plus que la ligne 32 ([rapport](tache2/jacoco-4-avec-tests-de-couverture/org.apache.tika.io/EndianUtils.java.html#L32)) : c'est le constructeur implicite `EndianUtils()`. Toutes les méthodes de la classe sont statiques et rien ne crée d'instance. Un test qui appellerait `new EndianUtils()` ferait monter la couverture sans vérifier aucun comportement : il n'a donc pas été écrit. PIT ne génère d'ailleurs aucun mutant sur cette ligne.
+
+## 14. Exécution dans GitHub Actions
 
 Le workflow [`.github/workflows/tache2.yml`](.github/workflows/tache2.yml) s'exécute à chaque push sur `main` qui modifie `tika-core` ou le workflow lui-même, et peut aussi être lancé à la main. Il :
 
 1. installe le JDK 17, puis compile `tika-core` et exécute tous ses tests (`./mvnw -pl tika-core -am install`) ;
-2. lance PIT trois fois, en excluant les bons tests à chaque fois (`-DexcludedTestClasses`), pour reproduire les trois mesures de la section 8 ;
-3. affiche dans le résumé de l'exécution le résultat des tests ajoutés, la couverture JaCoCo d'`EndianUtils` et le tableau des trois mesures ;
-4. conserve les rapports (PIT, Surefire, JaCoCo) dans l'artefact `tache2-rapports`.
+2. mesure la couverture JaCoCo d'`EndianUtils` pour chacune des quatre suites de tests (`-Dtest=…`), l'écrit dans `couverture-jacoco.csv` et en fait un rapport HTML limité à `EndianUtils` avec l'outil en ligne de commande de JaCoCo (le rapport HTML de Maven couvre tout `tika-core`) ;
+3. lance PIT quatre fois, avec la matrice complète (`-DfullMutationMatrix=true`), en excluant à chaque fois les tests ajoutés après la mesure (`-DexcludedTestClasses`) ;
+4. affiche dans le résumé de l'exécution les tests de `tika-core`, les tableaux de couverture et de mutation, les mutants survivants et, pour chaque test écrit à la main, le nombre de mutants qu'il est seul à tuer ; les mêmes chiffres apparaissent en annotations sur la page de l'exécution ;
+5. conserve les rapports dans l'artefact `tache2-rapports`, rangés comme le dossier `tache2/`, et les rapports complets de Surefire et de JaCoCo dans l'artefact `tache2-traces`.
 
 ChatUniTest n'est pas relancé dans GitHub Actions : il lui faut un LLM local, et la génération prend plusieurs heures.
 
 Exécutions : <https://github.com/Toky5/tika/actions/workflows/tache2.yml>.
 
-La première exécution, [n° 37821899615](https://github.com/Toky5/tika/actions/runs/37821899615), a réussi en 3 minutes. Son résumé redonne les trois mesures de la section 8 : 38, 86 puis 105 mutants tués sur 207.
+L'exécution [n° 37855166757](https://github.com/Toky5/tika/actions/runs/37855166757) a réussi en moins de 3 minutes : 782 tests dans `tika-core`, dont 37 pour `EndianUtils`, sans échec (2 tests ignorés). Les rapports PIT et JaCoCo du dossier `tache2/` viennent de son artefact `tache2-rapports`. Ses quatre mesures sont celles des sections 8 et 12 : 38, 86, 105 puis 204 mutants tués sur 206. Pour chaque test écrit à la main, elle donne aussi le même nombre de mutants qu'il est seul à tuer que le tableau de la section 12.
 
 Les workflows d'origine d'Apache Tika ont été désactivés sur ce fork : ils construisent tout le projet et publient des images Docker avec des secrets que le fork n'a pas. Seuls « no split packages » et ce workflow s'exécutent.
 
-## 14. Déclaration d'utilisation de l'IA
+## 15. Déclaration d'utilisation de l'IA
 
 L'énoncé autorise l'utilisation de l'IA à condition de la documenter. Voici les usages.
 
