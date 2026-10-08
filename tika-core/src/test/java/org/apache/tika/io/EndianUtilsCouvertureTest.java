@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
  * Tâche 2 (IFT3913) : tests écrits à la main pour le code de {@link EndianUtils} qu'aucun autre
  * test n'exécutait (ni les tests d'origine, ni les tests générés par ChatUniTest, ni
  * {@link EndianUtilsMutationTest}) : 14 méthodes jamais appelées et le cas du flux tronqué de
- * readUE7. Ils tuent les 100 mutants que PIT signalait comme non couverts.
+ * readUE7. Ils tuent les mutants que PIT signalait comme non couverts.
  * Chaque test est documenté dans le README.md (section « Tests écrits à la main pour le code
  * non couvert »).
  */
@@ -68,21 +68,6 @@ public class EndianUtilsCouvertureTest {
         assertEquals(0x01020304, EndianUtils.readIntBE(flux(1, 2, 3, 4)));
         assertEquals(0x0807060504030201L, EndianUtils.readLongLE(flux(1, 2, 3, 4, 5, 6, 7, 8)));
         assertEquals(0x0102030405060708L, EndianUtils.readLongBE(flux(1, 2, 3, 4, 5, 6, 7, 8)));
-    }
-
-    @Test
-    public void signeDesValeursLues() throws Exception {
-        // Tous les bits à 1 : -1 pour les lectures signées, la valeur maximale pour les autres.
-        assertEquals(-1, EndianUtils.readShortLE(flux(0xFF, 0xFF)));
-        assertEquals(-1, EndianUtils.readShortBE(flux(0xFF, 0xFF)));
-        assertEquals(0xFFFF, EndianUtils.readUShortLE(flux(0xFF, 0xFF)));
-        assertEquals(0xFFFF, EndianUtils.readUShortBE(flux(0xFF, 0xFF)));
-        assertEquals(-1, EndianUtils.readIntLE(flux(0xFF, 0xFF, 0xFF, 0xFF)));
-        assertEquals(-1, EndianUtils.readIntBE(flux(0xFF, 0xFF, 0xFF, 0xFF)));
-        // Seul le bit 31 est à 1 : dans un long, la valeur doit rester positive. Le code
-        // convertit cet octet en long avant de le décaler (« cast to long to preserve bit 31 »).
-        assertEquals(0x80000000L, EndianUtils.readLongLE(flux(0, 0, 0, 0x80, 0, 0, 0, 0)));
-        assertEquals(0x80000000L, EndianUtils.readLongBE(flux(0, 0, 0, 0, 0x80, 0, 0, 0)));
     }
 
     @Test

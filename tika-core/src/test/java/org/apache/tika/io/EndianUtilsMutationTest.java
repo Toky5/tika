@@ -65,16 +65,11 @@ public class EndianUtilsMutationTest {
     }
 
     @Test
-    public void readUIntBESurUnFluxTropCourtLeveUneException() {
-        // EndianUtilsTest.testReadUIntBE appelle readUIntLE par erreur : ce cas n'était pas testé.
-        assertThrows(EndianUtils.BufferUnderrunException.class,
-                () -> EndianUtils.readUIntBE(flux(0xFF, 0xFF, 0xFF)));
-    }
-
-    @Test
     public void uneFinDeFluxSuivieDOctetsEstDetectee() {
         // La première lecture renvoie -1 et les trois suivantes des octets valides :
-        // la valeur est incomplète dès qu'UNE des quatre lectures échoue.
+        // la valeur est incomplète dès qu'UNE des quatre lectures échoue. Pour readUIntBE,
+        // c'est aussi le cas du flux trop court que EndianUtilsTest.testReadUIntBE voulait
+        // vérifier, mais qu'il appliquait par erreur à readUIntLE.
         assertThrows(EndianUtils.BufferUnderrunException.class,
                 () -> EndianUtils.readUIntLE(fluxScripte(-1, 1, 2, 3)));
         assertThrows(EndianUtils.BufferUnderrunException.class,

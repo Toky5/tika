@@ -21,6 +21,9 @@
 #   2. + tests générés par ChatUniTest (classes EndianUtils_*_Test) ;
 #   3. + tests écrits à la main pour les mutants survivants (EndianUtilsMutationTest) ;
 #   4. + tests écrits à la main pour le code non couvert (EndianUtilsCouvertureTest).
+# PIT produit la matrice complète (fullMutationMatrix) : pour chaque mutant, la liste de tous
+# les tests qui le tuent. Le résumé s'en sert pour compter, pour chaque test écrit à la main,
+# les mutants qu'il est seul à tuer.
 # L'artefact « tache2-rapports » contient les rapports, rangés comme dans le dossier tache2/
 # du dépôt. ChatUniTest n'est pas relancé ici : il a besoin d'un LLM local (voir le README).
 
@@ -89,32 +92,32 @@ jobs:
 
       - name: "PIT 1/4 : tests d'origine"
         run: >
-          $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage
+          $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage -DfullMutationMatrix=true
           -DexcludedTestClasses="$TESTS_GENERES,$TESTS_MUTATION,$TESTS_COUVERTURE"
           -DreportsDirectory="$GITHUB_WORKSPACE/rapports/pit-1-tests-originaux"
 
       - name: "PIT 2/4 : + tests générés par ChatUniTest"
         run: >
-          $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage
+          $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage -DfullMutationMatrix=true
           -DexcludedTestClasses="$TESTS_MUTATION,$TESTS_COUVERTURE"
           -DreportsDirectory="$GITHUB_WORKSPACE/rapports/pit-2-avec-tests-generes"
 
       - name: "PIT 3/4 : + tests écrits à la main pour les mutants survivants"
         run: >
-          $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage
+          $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage -DfullMutationMatrix=true
           -DexcludedTestClasses="$TESTS_COUVERTURE"
           -DreportsDirectory="$GITHUB_WORKSPACE/rapports/pit-3-avec-tests-manuels"
 
       - name: "PIT 4/4 : + tests écrits à la main pour le code non couvert"
         run: >
-          $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage
+          $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage -DfullMutationMatrix=true
           -DreportsDirectory="$GITHUB_WORKSPACE/rapports/pit-4-avec-tests-de-couverture"
 
       - name: Résumé des résultats
         if: always()
         run: |
           python3 - <<'PY'
-          import csv, glob, os
+          import collections, csv, glob, os, re
           import xml.etree.ElementTree as ET
 
           resume = []
@@ -187,6 +190,50 @@ jobs:
                      for m in survivants]
           resume += ["", "Mutants qui survivent à la dernière exécution :", ""] + [f"- {d}" for d in details]
           annoncer("Survivants de la dernière exécution PIT", details or ["aucun"])
+
+          def rapport(nom):
+              f = f"rapports/{nom}/mutations.xml"
+              return list(ET.parse(f).getroot()) if os.path.exists(f) else []
+
+
+          def tueurs(m):
+              # Avec fullMutationMatrix, <killingTests> liste tous les tests qui tuent le mutant.
+              res = set()
+              for t in (m.findtext("killingTests") or m.findtext("killingTest") or "").split("|"):
+                  if t:
+                      methode = re.search(r"\[method:([^(\]]+)", t)
+                      res.add(t.split(".[engine")[0].rsplit(".", 1)[-1] + "." + (methode.group(1) if methode else "?"))
+              return res
+
+
+          non_couverts = collections.Counter(m.findtext("mutatedMethod") for m in rapport("pit-3-avec-tests-manuels")
+                                             if m.get("status") == "NO_COVERAGE")
+          annoncer("Mutants non couverts à la mesure 3, par méthode",
+                   [", ".join(f"{k} {v}" for k, v in sorted(non_couverts.items())) or "aucun"])
+
+          resume += ["", "## Tests écrits à la main : mutants qu'ils sont seuls à tuer", ""]
+          notes = []
+          for nom, classe in (("pit-3-avec-tests-manuels", "EndianUtilsMutationTest"),
+                              ("pit-4-avec-tests-de-couverture", "EndianUtilsCouvertureTest")):
+              ms = rapport(nom)
+              if not any(m.find("killingTests") is not None for m in ms):
+                  notes.append(f"{nom} : matrice complète absente")
+                  continue
+              seuls = collections.Counter()
+              for m in ms:
+                  t = tueurs(m)
+                  if len(t) == 1:
+                      seuls.update(t)
+              f = f"tika-core/target/surefire-reports/TEST-org.apache.tika.io.{classe}.xml"
+              tests = [c.get("name").split("(")[0] for c in ET.parse(f).getroot().iter("testcase")] if os.path.exists(f) else []
+              detail = ", ".join(f"{t} {seuls[classe + '.' + t]}" for t in tests)
+              notes.append(f"{nom} ({classe}) : {detail}")
+              resume.append(f"- {nom} ({classe}) : {detail}")
+          annoncer("Mutants tués par un seul test écrit à la main", notes)
+
+          annoncer("Mutants de getLongLE (mesure 4)",
+                   [f"ligne {m.findtext('lineNumber')} : {m.findtext('description')} ({m.get('status')})"
+                    for m in rapport("pit-4-avec-tests-de-couverture") if m.findtext("mutatedMethod") == "getLongLE"] or ["aucun"])
 
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as sortie:
               sortie.write("\n".join(resume) + "\n")
