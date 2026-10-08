@@ -1,0 +1,139 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Tâche 2 (IFT3913) : exécute tous les tests de tika-core (tests d'origine, tests générés
+# par ChatUniTest et tests écrits à la main), puis lance PIT trois fois sur EndianUtils
+# pour reproduire la comparaison du README :
+#   1. tests d'origine seulement ;
+#   2. tests d'origine + tests générés par ChatUniTest (classes EndianUtils_*_Test) ;
+#   3. tests d'origine + tests générés + tests écrits à la main (EndianUtilsMutationTest).
+# ChatUniTest lui-même n'est pas relancé ici : il a besoin d'un LLM local (voir le README).
+
+name: "Tâche 2 - tests et mutation (EndianUtils)"
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'tika-core/**'
+      - '.github/workflows/tache2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tache2-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MVN: ./mvnw -B -ntp
+  TESTS_GENERES: org.apache.tika.io.EndianUtils_*_Test
+  TESTS_MANUELS: org.apache.tika.io.EndianUtilsMutationTest
+
+jobs:
+  tests-et-mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Installer le JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Compiler tika-core et exécuter tous ses tests
+        run: $MVN -pl tika-core -am install
+
+      - name: "PIT 1/3 : tests d'origine"
+        run: >
+          $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage
+          -DexcludedTestClasses="$TESTS_GENERES,$TESTS_MANUELS"
+          -DreportsDirectory="$GITHUB_WORKSPACE/rapports/pit-1-tests-originaux"
+
+      - name: "PIT 2/3 : + tests générés par ChatUniTest"
+        run: >
+          $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage
+          -DexcludedTestClasses="$TESTS_MANUELS"
+          -DreportsDirectory="$GITHUB_WORKSPACE/rapports/pit-2-avec-tests-generes"
+
+      - name: "PIT 3/3 : + tests écrits à la main"
+        run: >
+          $MVN -pl tika-core org.pitest:pitest-maven:mutationCoverage
+          -DreportsDirectory="$GITHUB_WORKSPACE/rapports/pit-3-avec-tests-manuels"
+
+      - name: Résumé des résultats
+        if: always()
+        run: |
+          python3 - >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import csv, glob, os
+          import xml.etree.ElementTree as ET
+
+          print("## Tests ajoutés pour la tâche 2")
+          print()
+          print("| Classe de test | Tests | Échecs | Erreurs |")
+          print("|---|---|---|---|")
+          for f in sorted(glob.glob("tika-core/target/surefire-reports/TEST-org.apache.tika.io.EndianUtils*.xml")):
+              s = ET.parse(f).getroot()
+              print(f"| {s.get('name').rsplit('.', 1)[-1]} | {s.get('tests')} | {s.get('failures')} | {s.get('errors')} |")
+
+          jacoco = "tika-core/target/site/jacoco/jacoco.csv"
+          if os.path.exists(jacoco):
+              for r in csv.DictReader(open(jacoco)):
+                  if r["CLASS"] == "EndianUtils":
+                      lignes = int(r["LINE_COVERED"]) + int(r["LINE_MISSED"])
+                      branches = int(r["BRANCH_COVERED"]) + int(r["BRANCH_MISSED"])
+                      print()
+                      print(f"Couverture JaCoCo d'EndianUtils avec tous les tests : {r['LINE_COVERED']}/{lignes} lignes,"
+                            f" {r['BRANCH_COVERED']}/{branches} branches.")
+
+          print()
+          print("## Analyse de mutation d'EndianUtils (PIT)")
+          print()
+          print("| Exécution | Tués | Survivants | Non couverts | Score de mutation | Force des tests |")
+          print("|---|---|---|---|---|---|")
+          survivants = []
+          for d in sorted(glob.glob("rapports/pit-*")):
+              f = os.path.join(d, "mutations.xml")
+              if not os.path.exists(f):
+                  continue
+              ms = list(ET.parse(f).getroot())
+              tues = sum(m.get("detected") == "true" for m in ms)
+              non_couverts = sum(m.get("status") == "NO_COVERAGE" for m in ms)
+              survivants = [m for m in ms if m.get("status") == "SURVIVED"]
+              couverts = len(ms) - non_couverts
+              force = f"{100 * tues / couverts:.0f} %" if couverts else "-"
+              print(f"| {os.path.basename(d)} | {tues} | {len(survivants)} | {non_couverts} |"
+                    f" {100 * tues / len(ms):.0f} % ({tues}/{len(ms)}) | {force} |")
+          print()
+          print("Mutants qui survivent à la dernière exécution :")
+          print()
+          for m in survivants:
+              print(f"- ligne {m.findtext('lineNumber')}, `{m.findtext('mutatedMethod')}` : {m.findtext('description')}")
+          PY
+
+      - name: Téléverser les rapports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: tache2-rapports
+          path: |
+            rapports/
+            tika-core/target/surefire-reports/TEST-org.apache.tika.io.EndianUtils*.xml
+            tika-core/target/site/jacoco/
