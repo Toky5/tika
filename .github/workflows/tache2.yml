@@ -21,13 +21,10 @@
 #   2. + tests générés par ChatUniTest (classes EndianUtils_*_Test) ;
 #   3. + tests écrits à la main pour les mutants survivants (EndianUtilsMutationTest) ;
 #   4. + tests écrits à la main pour le code non couvert (EndianUtilsCouvertureTest).
-# Pour chaque suite, JaCoCo donne une ligne de couverture-jacoco.csv et un rapport HTML limité à
-# EndianUtils (le rapport HTML de Maven couvre tout tika-core).
-# PIT produit la matrice complète (fullMutationMatrix) : pour chaque mutant, la liste de tous
-# les tests qui le tuent. Le résumé s'en sert pour compter, pour chaque test écrit à la main,
-# les mutants qu'il est seul à tuer.
-# L'artefact « tache2-rapports » contient les rapports, rangés comme dans le dossier tache2/
-# du dépôt. ChatUniTest n'est pas relancé ici : il a besoin d'un LLM local (voir le README).
+# Pour chaque suite, JaCoCo produit un rapport HTML limité à EndianUtils, et PIT un rapport
+# HTML et XML avec la matrice complète (fullMutationMatrix : tous les tests qui tuent chaque
+# mutant). L'artefact « tache2-rapports » contient ces rapports, rangés comme dans le dossier
+# tache2/ du dépôt. ChatUniTest n'est pas relancé ici : il a besoin d'un LLM local (voir le README).
 
 name: "Tâche 2 - tests et mutation (EndianUtils)"
 
@@ -69,15 +66,15 @@ jobs:
       - name: Compiler tika-core et exécuter tous ses tests
         run: $MVN -pl tika-core -am install
 
-      - name: "Couverture JaCoCo d'EndianUtils (CSV et HTML), pour chacune des quatre suites"
+      - name: "Couverture JaCoCo d'EndianUtils, pour chacune des quatre suites"
         run: |
-          mkdir -p rapports outils
+          mkdir -p rapports outils mesures
           # jacococli fait un rapport HTML limité à EndianUtils à partir des données de l'agent JaCoCo.
           $MVN -N dependency:copy -Dartifact=org.jacoco:org.jacoco.cli:0.8.15:jar:nodeps -DoutputDirectory=outils
-          echo "mesure,instructions_couvertes,instructions,branches_couvertes,branches,lignes_couvertes,lignes,methodes_couvertes,methodes" > rapports/couverture-jacoco.csv
+          echo "mesure,instructions_couvertes,instructions,branches_couvertes,branches,lignes_couvertes,lignes,methodes_couvertes,methodes" > mesures/couverture-jacoco.csv
           mesurer() {
             $MVN -pl tika-core test -Djacoco.append=false -Dtest="$2"
-            python3 - "$1" >> rapports/couverture-jacoco.csv <<'PY'
+            python3 - "$1" >> mesures/couverture-jacoco.csv <<'PY'
           import csv, sys
           for r in csv.DictReader(open("tika-core/target/site/jacoco/jacoco.csv")):
               if r["PACKAGE"] == "org.apache.tika.io" and r["CLASS"] == "EndianUtils":
@@ -97,7 +94,7 @@ jobs:
           mesurer 2-avec-tests-generes "EndianUtilsTest,EndianUtils_*_Test"
           mesurer 3-avec-tests-manuels "EndianUtilsTest,EndianUtils_*_Test,EndianUtilsMutationTest"
           mesurer 4-avec-tests-de-couverture "EndianUtilsTest,EndianUtils_*_Test,EndianUtilsMutationTest,EndianUtilsCouvertureTest"
-          cat rapports/couverture-jacoco.csv
+          cat mesures/couverture-jacoco.csv
 
       - name: "PIT 1/4 : tests d'origine"
         run: >
@@ -126,7 +123,7 @@ jobs:
         if: always()
         run: |
           python3 - <<'PY'
-          import collections, csv, glob, os, re
+          import csv, glob, os
           import xml.etree.ElementTree as ET
 
           resume = []
@@ -164,8 +161,8 @@ jobs:
           resume += ["", "## Couverture JaCoCo d'EndianUtils", "",
                      "| Suite de tests | Instructions | Branches | Lignes | Méthodes |", "|---|---|---|---|---|"]
           notes = []
-          if os.path.exists("rapports/couverture-jacoco.csv"):
-              for r in csv.DictReader(open("rapports/couverture-jacoco.csv")):
+          if os.path.exists("mesures/couverture-jacoco.csv"):
+              for r in csv.DictReader(open("mesures/couverture-jacoco.csv")):
                   cellules = []
                   for k in ("instructions", "branches", "lignes", "methodes"):
                       n, t = int(r[k + "_couvertes"]), int(r[k])
@@ -200,50 +197,6 @@ jobs:
           resume += ["", "Mutants qui survivent à la dernière exécution :", ""] + [f"- {d}" for d in details]
           annoncer("Survivants de la dernière exécution PIT", details or ["aucun"])
 
-          def rapport(nom):
-              f = f"rapports/{nom}/mutations.xml"
-              return list(ET.parse(f).getroot()) if os.path.exists(f) else []
-
-
-          def tueurs(m):
-              # Avec fullMutationMatrix, <killingTests> liste tous les tests qui tuent le mutant.
-              res = set()
-              for t in (m.findtext("killingTests") or m.findtext("killingTest") or "").split("|"):
-                  if t:
-                      methode = re.search(r"\[method:([^(\]]+)", t)
-                      res.add(t.split(".[engine")[0].rsplit(".", 1)[-1] + "." + (methode.group(1) if methode else "?"))
-              return res
-
-
-          non_couverts = collections.Counter(m.findtext("mutatedMethod") for m in rapport("pit-3-avec-tests-manuels")
-                                             if m.get("status") == "NO_COVERAGE")
-          annoncer("Mutants non couverts à la mesure 3, par méthode",
-                   [", ".join(f"{k} {v}" for k, v in sorted(non_couverts.items())) or "aucun"])
-
-          resume += ["", "## Tests écrits à la main : mutants qu'ils sont seuls à tuer", ""]
-          notes = []
-          for nom, classe in (("pit-3-avec-tests-manuels", "EndianUtilsMutationTest"),
-                              ("pit-4-avec-tests-de-couverture", "EndianUtilsCouvertureTest")):
-              ms = rapport(nom)
-              if not any(m.find("killingTests") is not None for m in ms):
-                  notes.append(f"{nom} : matrice complète absente")
-                  continue
-              seuls = collections.Counter()
-              for m in ms:
-                  t = tueurs(m)
-                  if len(t) == 1:
-                      seuls.update(t)
-              f = f"tika-core/target/surefire-reports/TEST-org.apache.tika.io.{classe}.xml"
-              tests = [c.get("name").split("(")[0] for c in ET.parse(f).getroot().iter("testcase")] if os.path.exists(f) else []
-              detail = ", ".join(f"{t} {seuls[classe + '.' + t]}" for t in tests)
-              notes.append(f"{nom} ({classe}) : {detail}")
-              resume.append(f"- {nom} ({classe}) : {detail}")
-          annoncer("Mutants tués par un seul test écrit à la main", notes)
-
-          annoncer("Mutants de getLongLE (mesure 4)",
-                   [f"ligne {m.findtext('lineNumber')} : {m.findtext('description')} ({m.get('status')})"
-                    for m in rapport("pit-4-avec-tests-de-couverture") if m.findtext("mutatedMethod") == "getLongLE"] or ["aucun"])
-
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as sortie:
               sortie.write("\n".join(resume) + "\n")
           PY
@@ -254,12 +207,3 @@ jobs:
         with:
           name: tache2-rapports
           path: rapports/
-
-      - name: Téléverser les traces (rapports Surefire et JaCoCo complets)
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: tache2-traces
-          path: |
-            tika-core/target/surefire-reports/TEST-org.apache.tika.io.EndianUtils*.xml
-            tika-core/target/site/jacoco/
