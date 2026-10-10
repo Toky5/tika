@@ -24,14 +24,11 @@ import java.io.InputStream;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * Tâche 2 (IFT3913) : tests écrits à la main pour tuer les mutants de {@link EndianUtils}
- * qui survivent aux tests d'origine et aux tests générés par ChatUniTest.
- * Chaque test est documenté dans le README.md (section « Tests écrits à la main »).
- */
+// Tache 2 : tests ajoutes pour les mutants qui survivaient (mesure 3, voir le README).
+// Faits rapidement a l'aide de l'IA generative, puis verifies avec PIT.
 public class EndianUtilsMutationTest {
 
-    /** Flux qui contient exactement les octets donnés. */
+    // flux avec les octets donnes
     private static InputStream flux(int... octets) {
         byte[] donnees = new byte[octets.length];
         for (int i = 0; i < octets.length; i++) {
@@ -40,10 +37,7 @@ public class EndianUtilsMutationTest {
         return new ByteArrayInputStream(donnees);
     }
 
-    /**
-     * Flux qui renvoie les valeurs données telles quelles, -1 compris, puis -1 indéfiniment.
-     * Il imite un flux dont la fin n'est pas définitive, comme une console après Ctrl-Z.
-     */
+    // flux qui renvoie les valeurs telles quelles (meme -1), puis -1
     private static InputStream fluxScripte(int... valeurs) {
         return new InputStream() {
             private int position = 0;
@@ -57,8 +51,7 @@ public class EndianUtilsMutationTest {
 
     @Test
     public void quatreOctetsNulsNeSontPasUneFinDeFlux() throws Exception {
-        // Le OU des quatre octets lus vaut 0 : c'est la limite exacte entre une lecture
-        // valide (>= 0) et une fin de flux (< 0).
+        // 4 octets a 0 : le OU donne 0, ca ne doit pas etre vu comme une fin de flux
         assertEquals(0L, EndianUtils.readUIntLE(flux(0, 0, 0, 0)));
         assertEquals(0L, EndianUtils.readUIntBE(flux(0, 0, 0, 0)));
         assertEquals(0, EndianUtils.readIntME(flux(0, 0, 0, 0)));
@@ -66,10 +59,8 @@ public class EndianUtilsMutationTest {
 
     @Test
     public void uneFinDeFluxSuivieDOctetsEstDetectee() {
-        // La première lecture renvoie -1 et les trois suivantes des octets valides :
-        // la valeur est incomplète dès qu'UNE des quatre lectures échoue. Pour readUIntBE,
-        // c'est aussi le cas du flux trop court que EndianUtilsTest.testReadUIntBE voulait
-        // vérifier, mais qu'il appliquait par erreur à readUIntLE.
+        // -1 au debut puis des octets valides -> exception quand meme
+        // (testReadUIntBE de EndianUtilsTest appelle readUIntLE par erreur)
         assertThrows(EndianUtils.BufferUnderrunException.class,
                 () -> EndianUtils.readUIntLE(fluxScripte(-1, 1, 2, 3)));
         assertThrows(EndianUtils.BufferUnderrunException.class,
@@ -80,23 +71,20 @@ public class EndianUtilsMutationTest {
 
     @Test
     public void readUE7AccepteUnDernierGroupeNul() throws Exception {
-        // 0x81 : groupe de valeur 1 avec le bit de continuation ; 0x00 : dernier groupe, nul.
-        // Valeur attendue : 1 * 128 + 0 = 128.
+        // 0x81 puis 0x00 -> 1 * 128 + 0 = 128
         assertEquals(128L, EndianUtils.readUE7(flux(0x81, 0x00)));
     }
 
     @Test
     public void readUE7NeDecodePasPlusDeSixOctets() throws Exception {
-        // Un groupe 1 suivi de cinq groupes nuls donne 2^35 ; le septième octet (0x80)
-        // est lu mais ignoré, car readUE7 décode au plus six groupes de 7 bits.
+        // 6 octets max, le 7e est ignore -> 2^35
         assertEquals(1L << 35,
                 EndianUtils.readUE7(flux(0x81, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00)));
     }
 
     @Test
     public void getIntLEAvecQuatreOctetsDistinctsNonNuls() {
-        // Chaque octet est non nul et a un poids différent : un décalage ou une addition
-        // faussé change le résultat, ce que les octets nuls du test généré masquaient.
+        // avec {0, 0, 0, 1} (test genere) les mutants sur les decalages survivaient
         assertEquals(0x04030201, EndianUtils.getIntLE(new byte[] {0x01, 0x02, 0x03, 0x04}, 0));
     }
 }

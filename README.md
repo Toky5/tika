@@ -36,8 +36,6 @@ Les rapports portent sur quatre suites de tests, chacune comprenant la précéde
 3. **+ tests écrits à la main pour les mutants survivants** : 5 tests (section 6.1) ;
 4. **+ tests écrits à la main pour les mutants non couverts** : 6 tests (section 6.2).
 
-Sur GitHub, une page HTML s'affiche sous forme de code : pour voir les rapports, il faut cloner le dépôt (ou télécharger son archive) et ouvrir les fichiers `index.html` dans un navigateur. Dans les rapports JaCoCo, les lignes couvertes sont en vert, les lignes couvertes en partie (une partie des branches seulement) en jaune, et les autres en rouge. Les chiffres de ce README portent sur la classe `EndianUtils` ; la ligne « Total » des rapports JaCoCo compte aussi sa classe interne `BufferUnderrunException` (2 lignes, toujours couvertes).
-
 ## 1. Classe choisie
 
 La classe étudiée est **`org.apache.tika.io.EndianUtils`**, du module `tika-core`. Elle lit des entiers en little-endian (LE), en big-endian (BE) ou en « middle-endian », depuis un flux (méthodes `read*`) ou depuis un tableau d'octets (méthodes `get*`). Elle a déjà des tests, `EndianUtilsTest`, mais ils sont loin de la couvrir entièrement :
@@ -94,7 +92,7 @@ ChatUniTest 2.1.1 est déclaré comme plugin Maven dans [`tika-core/pom.xml`](ti
 | `merge=false` | La classe « suite » que ChatUniTest fusionne utilise `@RunWith(JUnitPlatform.class)`, de JUnit 4, absent de Tika, qui utilise JUnit 6. |
 | `tmpOutput`, `testOutput` | Les fichiers de travail vont dans `target/` ; les tests produits vont dans `tika-core/chatunitest-tests/`, hors des sources de Tika. |
 
-ChatUniTest demande aussi la dépendance `chatunitest-starter` pour compiler et exécuter ses tests. Elle apporte de vieilles versions de Mockito, de ByteBuddy, le moteur JUnit Vintage et `junit-platform-runner`, incompatibles avec Java 17 et refusées par la règle `dependencyConvergence` de Maven Enforcer. Elles sont donc exclues, au profit des versions que gère Tika :
+Dépendances de test ajoutées :
 
 ```xml
 <dependency>
@@ -333,7 +331,7 @@ Les 48 mutants que les tests générés tuent en plus étaient tous **non couver
 
 ## 6. Tests écrits à la main
 
-Des tests ont été écrits à la main pour tous les mutants non détectés, sauf les 2 qui sont équivalents (section 6.3). Les deux classes de tests utilisent deux méthodes utilitaires : `flux(...)` donne un flux qui contient exactement les octets indiqués ; `fluxScripte(...)` donne un flux qui renvoie les valeurs indiquées telles quelles, -1 compris, puis -1.
+Des tests ont été écrits à la main pour tous les mutants non détectés, sauf les 2 qui sont équivalents (section 6.3). Ils ont été faits rapidement à l'aide de l'IA générative (section 8), puis vérifiés avec PIT et JaCoCo. Les deux classes de tests utilisent deux méthodes utilitaires : `flux(...)` donne un flux qui contient exactement les octets indiqués ; `fluxScripte(...)` donne un flux qui renvoie les valeurs indiquées telles quelles, -1 compris, puis -1.
 
 ### 6.1 Pour les 21 mutants survivants : `EndianUtilsMutationTest`
 

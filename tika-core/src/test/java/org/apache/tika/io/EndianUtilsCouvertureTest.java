@@ -25,17 +25,11 @@ import java.io.InputStream;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * Tâche 2 (IFT3913) : tests écrits à la main pour le code de {@link EndianUtils} qu'aucun autre
- * test n'exécutait (ni les tests d'origine, ni les tests générés par ChatUniTest, ni
- * {@link EndianUtilsMutationTest}) : 14 méthodes jamais appelées et le cas du flux tronqué de
- * readUE7. Ils tuent les mutants que PIT signalait comme non couverts.
- * Chaque test est documenté dans le README.md (section « Tests écrits à la main pour le code
- * non couvert »).
- */
+// Tache 2 : tests pour les methodes qu'aucun test n'appelait (mesure 4, voir le README).
+// Faits rapidement a l'aide de l'IA generative, puis verifies avec PIT et JaCoCo.
 public class EndianUtilsCouvertureTest {
 
-    /** Flux qui contient exactement les octets donnés. */
+    // flux avec les octets donnes
     private static InputStream flux(int... octets) {
         byte[] donnees = new byte[octets.length];
         for (int i = 0; i < octets.length; i++) {
@@ -44,7 +38,7 @@ public class EndianUtilsCouvertureTest {
         return new ByteArrayInputStream(donnees);
     }
 
-    /** Flux qui renvoie les valeurs données telles quelles, -1 compris, puis -1 indéfiniment. */
+    // flux qui renvoie les valeurs telles quelles (meme -1), puis -1
     private static InputStream fluxScripte(int... valeurs) {
         return new InputStream() {
             private int position = 0;
@@ -58,8 +52,8 @@ public class EndianUtilsCouvertureTest {
 
     @Test
     public void lectureDOctetsDistinctsDepuisUnFlux() throws Exception {
-        // Des octets distincts et non nuls : chacun a un poids différent dans le résultat,
-        // et la valeur attendue se lit directement en hexadécimal.
+        // variantes a verifier : short, ushort, int et long, chacune en LE et en BE
+        // ex. avec 1, 2 : LE -> 0x0201, BE -> 0x0102
         assertEquals(0x0201, EndianUtils.readShortLE(flux(1, 2)));
         assertEquals(0x0102, EndianUtils.readShortBE(flux(1, 2)));
         assertEquals(0x0201, EndianUtils.readUShortLE(flux(1, 2)));
@@ -72,8 +66,7 @@ public class EndianUtilsCouvertureTest {
 
     @Test
     public void octetsNulsLusSansFinDeFlux() throws Exception {
-        // Le OU des octets lus vaut exactement 0 : c'est la limite entre une lecture valide
-        // (>= 0) et une fin de flux (< 0).
+        // que des 0 : ce n'est pas une fin de flux
         assertEquals(0, EndianUtils.readUShortLE(flux(0, 0)));
         assertEquals(0, EndianUtils.readUShortBE(flux(0, 0)));
         assertEquals(0, EndianUtils.readIntLE(flux(0, 0, 0, 0)));
@@ -84,8 +77,7 @@ public class EndianUtilsCouvertureTest {
 
     @Test
     public void finDeFluxDetecteeMemeSiDesOctetsSuivent() {
-        // La première lecture renvoie -1 et les suivantes des octets valides : la valeur est
-        // incomplète dès qu'UNE des lectures échoue.
+        // -1 au debut puis des octets valides -> exception
         assertThrows(EndianUtils.BufferUnderrunException.class,
                 () -> EndianUtils.readUShortLE(fluxScripte(-1, 1)));
         assertThrows(EndianUtils.BufferUnderrunException.class,
@@ -102,16 +94,14 @@ public class EndianUtilsCouvertureTest {
 
     @Test
     public void readUE7SignaleUnFluxTronque() {
-        // Un flux vide, puis un flux qui ne contient que 0x81 : le bit de poids fort de cet
-        // octet annonce un octet suivant, qui n'arrive jamais. Dans les deux cas, la valeur est
-        // incomplète.
+        // flux vide, puis 0x81 tout seul (il annonce un octet qui n'arrive pas)
         assertThrows(IOException.class, () -> EndianUtils.readUE7(flux()));
         assertThrows(IOException.class, () -> EndianUtils.readUE7(flux(0x81)));
     }
 
     @Test
     public void surchargesSansDecalageLisentDepuisLeDebut() {
-        // Les surcharges sans décalage doivent lire à partir de l'indice 0.
+        // les versions sans offset doivent lire a partir de l'indice 0
         byte[] octets = {0x01, 0x02, 0x03, 0x04};
         assertEquals(0x0201, EndianUtils.getShortLE(octets));
         assertEquals(0x0201, EndianUtils.getUShortLE(octets));
@@ -122,8 +112,7 @@ public class EndianUtilsCouvertureTest {
 
     @Test
     public void getLongLEAvecOctetsDistinctsEtDecalage() {
-        // Huit octets distincts : chacun doit garder sa place. Avec un décalage de 2,
-        // les deux premiers octets (0x7F) doivent être ignorés.
+        // offset 2 : les deux 0x7F du debut doivent etre ignores
         assertEquals(0x0807060504030201L,
                 EndianUtils.getLongLE(new byte[] {1, 2, 3, 4, 5, 6, 7, 8}, 0));
         assertEquals(0x0807060504030201L,
