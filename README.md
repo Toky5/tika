@@ -33,6 +33,8 @@ On a fait les mesures sur 4 suites de tests, chacune contient la précédente :
 ## 1. Classe choisie
 
 On a pris `org.apache.tika.io.EndianUtils`, dans `tika-core`. Elle lit des entiers en little-endian, en big-endian ou en « middle-endian », soit depuis un flux (`read*`), soit depuis un tableau d'octets (`get*`).
+Lien utilisé pour les conversion pour les tests: https://blockchain-academy.hs-mittweida.de/litte-big-endian-converter/
+
 
 Elle a déjà des tests (`EndianUtilsTest`), mais ils couvrent peu de choses :
 
