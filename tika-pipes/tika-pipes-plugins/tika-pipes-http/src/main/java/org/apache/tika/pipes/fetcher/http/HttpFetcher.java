@@ -28,25 +28,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.security.GeneralSecurityException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -64,8 +55,6 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.conn.ssl.NoopHostnameVerifier;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.ConnectionShutdownException;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
@@ -141,10 +130,6 @@ public class HttpFetcher extends AbstractTikaExtension implements Fetcher, Range
     public static Property HTTP_CONTENT_TYPE = Property.externalText(HTTP_HEADER_PREFIX + "content-type");
 
     private static String USER_AGENT = "User-Agent";
-
-    // TACHE3-V5 (secret code en dur) : cle HMAC de signature des JWT ecrite dans le code source.
-    // Toute personne qui lit le depot (ou decompile le jar) peut forger des jetons valides.
-    private static final String DEFAULT_JWT_SECRET = "tika-fetcher-2026-Sup3rS3cr3t!";
 
     Logger LOG = LoggerFactory.getLogger(HttpFetcher.class);
 
@@ -370,7 +355,6 @@ public class HttpFetcher extends AbstractTikaExtension implements Fetcher, Range
         if (response == null) {
             return;
         }
-        metadata.set(HTTP_FETCH_PREFIX + "url-fingerprint", fingerprint(url));
 
         if (response.getStatusLine() != null) {
             metadata.set(HTTP_STATUS_CODE, response
@@ -506,10 +490,6 @@ public class HttpFetcher extends AbstractTikaExtension implements Fetcher, Range
         HttpClientFactory cp = httpClientFactory.copy();
         cp.setDisableContentCompression(true);
         noCompressHttpClient = cp.build();
-        if (Boolean.getBoolean("tika.http.trustAllCertificates")) {
-            // TACHE3-V7 : voir buildTrustAllClient
-            httpClient = buildTrustAllClient();
-        }
 
         if (!StringUtils.isBlank(httpFetcherConfig.getJwtPrivateKeyBase64())) {
             PrivateKey key = JwtPrivateKeyCreds.convertBase64ToPrivateKey(httpFetcherConfig.getJwtPrivateKeyBase64());
@@ -519,59 +499,9 @@ public class HttpFetcher extends AbstractTikaExtension implements Fetcher, Range
             jwtGenerator = new JwtGenerator(new JwtSecretCreds(httpFetcherConfig
                     .getJwtSecret()
                     .getBytes(StandardCharsets.UTF_8), httpFetcherConfig.getJwtIssuer(), httpFetcherConfig.getJwtSubject(), httpFetcherConfig.getJwtExpiresInSeconds()));
-        } else if (Boolean.getBoolean("tika.http.useDefaultJwtSecret")) {
-            // TACHE3-V5 : repli sur le secret code en dur
-            jwtGenerator = new JwtGenerator(new JwtSecretCreds(DEFAULT_JWT_SECRET.getBytes(StandardCharsets.UTF_8),
-                    httpFetcherConfig.getJwtIssuer(), httpFetcherConfig.getJwtSubject(), httpFetcherConfig.getJwtExpiresInSeconds()));
         }
         if (!StringUtils.isBlank(httpFetcherConfig.getJwtSecret()) && !StringUtils.isBlank(httpFetcherConfig.getJwtPrivateKeyBase64())) {
             throw new TikaConfigException("Both JWT secret and JWT private key base 64 were " + "specified. Only one or the other is supported");
-        }
-    }
-
-    /**
-     * TACHE3-V6 (hachage faible) : MD5 sert d'empreinte d'integrite pour l'URL recuperee.
-     * MD5 n'est plus resistant aux collisions : deux URL differentes peuvent produire
-     * la meme empreinte, donc l'empreinte ne garantit rien.
-     */
-    private static String fingerprint(String url) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            return HexFormat.of().formatHex(md.digest(url.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            return null;
-        }
-    }
-
-    /**
-     * TACHE3-V7 (TLS sans verification) : le TrustManager accepte n'importe quel certificat
-     * et le verificateur de nom d'hote est desactive. Une attaque de l'homme du milieu
-     * peut alors lire et modifier tout le trafic HTTPS du fetcher.
-     */
-    private static HttpClient buildTrustAllClient() throws TikaConfigException {
-        TrustManager[] trustAll = new TrustManager[]{new X509TrustManager() {
-            @Override
-            public X509Certificate[] getAcceptedIssuers() {
-                return new X509Certificate[0];
-            }
-
-            @Override
-            public void checkClientTrusted(X509Certificate[] chain, String authType) {
-            }
-
-            @Override
-            public void checkServerTrusted(X509Certificate[] chain, String authType) {
-            }
-        }};
-        try {
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, trustAll, new SecureRandom());
-            return HttpClients.custom()
-                    .setSSLContext(sslContext)
-                    .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-                    .build();
-        } catch (GeneralSecurityException e) {
-            throw new TikaConfigException("Could not build the TLS context", e);
         }
     }
 
