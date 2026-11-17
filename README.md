@@ -1,6 +1,6 @@
 # IFT3913 : Tâche 3, Semgrep dans Apache Tika
 
-*Le rapport de la tâche 2 se trouve maintenant dans [`README-tache2.md`](README-tache2.md).*
+*Le rapport de la tâche 2 se trouve dans [`README-tache2.md`](README-tache2.md).*
 
 <p align="center">
   <a href="https://github.com/semgrep/semgrep">
@@ -8,54 +8,53 @@
   </a>
 </p>
 <h3 align="center">« Code scanning at ludicrous speed. »</h3>
-<p align="center"><em>Le slogan et le logo du dépôt open source de Semgrep (voir les crédits, section 6)</em></p>
+<p align="center"><em>Le slogan et le logo du dépôt open source de Semgrep (voir les crédits)</em></p>
 
 **Équipe :** Toky Erick Rabenantoandro, Luc Brennan
 
 ## 1. Les fichiers modifiés et leur fonctionnement
 
-Pour cette tâche, nous avons modifié deux classes Java de Tika, ajouté un fichier de règles Semgrep, modifié le workflow GitHub Actions et écrit une petite action GitHub maison. Voici où se trouve chaque fichier et ce qu'il fait. Nous avons choisi `TikaResource` et `HttpFetcher` parce que ce sont deux portes d'entrée de Tika sur le réseau : l'une reçoit des requêtes HTTP de n'importe quel client, l'autre va chercher des documents sur Internet.
+Nous avons modifié deux classes Java de Tika, ajouté un fichier de règles Semgrep, modifié le workflow et écrit une petite action GitHub. Les deux classes ont été choisies parce que ce sont deux portes d'entrée de Tika sur le réseau.
 
 ### TikaResource.java
 
 [`tika-server/tika-server-core/src/main/java/org/apache/tika/server/core/resource/TikaResource.java`](tika-server/tika-server-core/src/main/java/org/apache/tika/server/core/resource/TikaResource.java)
 
-C'est la ressource JAX-RS qui répond aux requêtes envoyées à `/tika` sur tika-server. Elle reçoit un document par PUT ou par POST multipart, et lit les en-têtes HTTP pour remplir les métadonnées comme le nom du fichier et le type MIME. Elle lance ensuite l'analyse et renvoie le contenu extrait dans le format demandé par l'URL (texte, HTML, XML, JSON ou Markdown). Comme elle reçoit directement les données du client, c'est un bon endroit pour introduire des failles d'injection.
+C'est la ressource JAX-RS qui répond aux requêtes envoyées à `/tika` sur tika-server. Elle reçoit un document et lit les en-têtes HTTP pour remplir les métadonnées. Elle lance ensuite l'analyse et renvoie le contenu extrait dans le format demandé. Comme elle reçoit directement les données du client, c'est le bon endroit pour des failles d'injection.
 
 ### HttpFetcher.java
 
 [`tika-pipes/tika-pipes-plugins/tika-pipes-http/src/main/java/org/apache/tika/pipes/fetcher/http/HttpFetcher.java`](tika-pipes/tika-pipes-plugins/tika-pipes-http/src/main/java/org/apache/tika/pipes/fetcher/http/HttpFetcher.java)
 
-Cette classe du module tika-pipes-http récupère un document à partir d'une URL avant que Tika l'analyse. Elle construit une requête GET avec Apache HttpClient et y ajoute des en-têtes, ainsi qu'un jeton JWT d'authentification si c'est configuré. Elle copie ensuite la réponse dans un fichier temporaire et ajoute aux métadonnées les informations de la connexion, comme le code de statut et le type de contenu. Parce qu'elle gère des connexions HTTPS et des secrets, nous l'avons choisie pour les failles de cryptographie et de TLS.
+Cette classe récupère un document à partir d'une URL avant que Tika l'analyse. Elle construit une requête GET avec Apache HttpClient et peut y ajouter un jeton JWT. Elle copie ensuite la réponse dans un fichier temporaire et note les informations de la connexion dans les métadonnées. Comme elle gère des connexions HTTPS et des secrets, nous l'avons choisie pour les failles de cryptographie et de TLS.
 
 ### regles-tache3.yml
 
 [`tache3/semgrep/regles-tache3.yml`](tache3/semgrep/regles-tache3.yml)
 
-Ce fichier contient les sept règles Semgrep que nous avons écrites, une par vulnérabilité. Chaque règle a un identifiant qui commence par `tache3-`, un message qui explique le problème et la catégorie CWE dans ses métadonnées. Les règles décrivent la forme générale du défaut plutôt que notre code exact, donc elles peuvent aussi trouver le même problème ailleurs dans Tika. Le workflow les donne à Semgrep avec l'option `--config tache3/semgrep`.
+Ce fichier contient nos sept règles Semgrep, une par vulnérabilité. Chaque règle a un identifiant qui commence par `tache3-`, un message qui explique le problème et sa catégorie CWE. Les règles décrivent la forme du défaut plutôt que notre code exact, donc elles trouvent aussi le même problème ailleurs dans Tika. Le workflow les passe à Semgrep avec `--config tache3/semgrep`.
 
 ### tache2.yml
 
 [`.github/workflows/tache2.yml`](.github/workflows/tache2.yml)
 
-C'est le workflow GitHub Actions qui compile et teste tika-core, et nous y avons ajouté un job `semgrep` qui s'exécute avant le build. Ce job installe Semgrep avec pip sur le runner, ce qui permet à n'importe qui de lancer le workflow sans rien installer chez soi. Il produit un rapport complet publié comme artefact, puis relance Semgrep avec `--baseline-commit` et `--error` pour ne garder que les vulnérabilités absentes du commit précédent. Si le commit en ajoute une, le job échoue et le build ne démarre pas, grâce à `needs: semgrep`.
+C'est le workflow qui compile et teste tika-core, auquel nous avons ajouté un job `semgrep` qui tourne avant le build. Ce job installe Semgrep avec pip sur le runner, donc n'importe qui peut lancer le workflow sans rien installer. Il publie un rapport complet en artefact, puis relance Semgrep avec `--baseline-commit` et `--error` pour ne garder que les vulnérabilités absentes du commit précédent. S'il en trouve une, le job échoue et, grâce à `needs: semgrep`, le build ne démarre pas.
 
-**Choix de conception :** nous avons ajouté le job au workflow existant plutôt que d'en créer un nouveau, parce que l'énoncé demande que le processus de build lui-même échoue ; avec `needs: semgrep`, la compilation et les tests ne démarrent même pas. Le mode baseline est indispensable, car Tika contient déjà du code que Semgrep signale, et sans lui le workflow serait rouge en permanence. Le commit de référence est la base de la pull request pour une pull request, le commit d'avant le push pour un push, et le parent du commit (`HEAD~1`) pour un lancement manuel ou le premier push d'une branche ; le checkout récupère tout l'historique (`fetch-depth: 0`) pour que ce commit soit disponible. L'analyse combine nos règles et le jeu public `p/java`, pour que le build échoue sur toute nouvelle vulnérabilité détectée par Semgrep et pas seulement sur les nôtres, et Semgrep est installé à chaque exécution dans une plage de versions fixée (`>=1.100,<2`) pour éviter qu'une mise à jour majeure casse le workflow. Le rapport complet est publié avant l'étape bloquante, donc il reste disponible même quand celle-ci échoue.
+**Choix de conception :** nous avons modifié le workflow existant plutôt que d'en créer un nouveau, pour que ce soit bien le build qui échoue. Le mode baseline est indispensable, car Tika contient déjà du code que Semgrep signale et le workflow serait sinon toujours rouge. Le commit de référence est la base de la PR pour une pull request, le commit d'avant le push pour un push, et `HEAD~1` sinon ; le checkout récupère tout l'historique (`fetch-depth: 0`) pour y avoir accès. Nous utilisons nos règles et le jeu public `p/java`, pour bloquer toute nouvelle vulnérabilité détectée par Semgrep et pas seulement les nôtres.
 
-**Validation :** comme les Actions étaient désactivées sur notre fork au moment où nous avons poussé le travail, nous avons rejoué la validation une fois les Actions activées, avec deux commits qui retirent puis remettent les vulnérabilités. Le premier, un `git revert` du commit des vulnérabilités, correspond à l'état « avant » : les règles et le workflow sont là, mais le code de Tika est intact. Dans l'exécution #8 du workflow [`tache2`](https://github.com/Toky5/tika/actions/workflows/tache2.yml), le job `semgrep` passe et le build réussit, puisque retirer du code n'ajoute aucune vulnérabilité. Le second commit remet les vulnérabilités ; dans l'[exécution #9](https://github.com/Toky5/tika/actions/runs/44039199316), le job `semgrep` échoue avec dix nouveaux résultats marqués « Blocking », et le build ne démarre pas. Le commit suivant, qui ne touche qu'à ce README, doit repasser au vert, car les vulnérabilités font maintenant partie du commit de référence ; cela montre que seul le code nouvellement introduit bloque le build. On peut reproduire l'analyse en local avec `semgrep scan --config tache3/semgrep` suivi des chemins des deux fichiers modifiés.
+**Validation :** les Actions étant désactivées sur notre fork au moment du premier push, nous avons rejoué la validation avec deux commits. Le premier retire les vulnérabilités (`git revert`) : dans l'exécution #8, `semgrep` passe et le build réussit. Le second les remet : dans l'[exécution #9](https://github.com/Toky5/tika/actions/runs/44039199316), `semgrep` échoue avec dix nouveaux résultats et le build ne démarre pas. Le commit suivant, qui ne touche qu'au README, repasse au vert, ce qui montre que seul le code nouveau bloque le build.
 
 <p align="center"><img src="tache3/captures/liste-executions.png" alt="Liste des exécutions : #8 réussie, #9 en échec"/></p>
-<p align="center"><em>L'exécution #8 (vulnérabilités retirées) réussit, l'exécution #9 (vulnérabilités remises) échoue.</em></p>
 
 ### rickroll/action.yml
 
 [`.github/actions/rickroll/action.yml`](.github/actions/rickroll/action.yml)
 
-C'est une petite action GitHub composite que nous avons écrite en nous inspirant de l'action `random-rickroll`. Le workflow principal l'appelle quand un test de tika-core échoue, grâce à la condition `if: failure()`, et un petit workflow [`rickroll.yml`](.github/workflows/rickroll.yml) l'appelle aussi dès que quelqu'un ouvre une issue. Elle s'occupe alors de remonter le moral de la personne qui vient de casser le build, d'une façon que nous vous laissons découvrir à la section 5. Comme c'est une action réutilisable, n'importe quel autre workflow peut l'appeler avec `uses:`.
+C'est une petite action composite inspirée de l'action `random-rickroll`. Le workflow l'appelle quand un test de tika-core échoue (`if: failure()`), et le workflow [`rickroll.yml`](.github/workflows/rickroll.yml) l'appelle quand quelqu'un ouvre une issue. Elle remonte alors le moral de la personne concernée, d'une façon que nous laissons découvrir à la section 5. Comme c'est une action réutilisable, n'importe quel workflow peut l'appeler avec `uses:`.
 
 ## 2. Les vulnérabilités ajoutées
 
-Dans cette section, nous montrons le code que nous avons ajouté dans les deux classes Java. Pour chaque ajout, nous donnons le type de vulnérabilité, la raison pour laquelle le code est vulnérable, la règle Semgrep qui la détecte et le résultat obtenu avec Semgrep. Chaque ajout est marqué par un commentaire `TACHE3-V1` à `TACHE3-V7` : il suffit de chercher « TACHE3 » dans le fichier pour le retrouver. La plupart de ces ajouts ne s'activent qu'avec une propriété système, pour ne pas changer le comportement normal de Tika.
+Voici le code ajouté pour chaque vulnérabilité, avec son type, la règle qui la détecte et le résultat de Semgrep. Chaque ajout est marqué par un commentaire `TACHE3-V1` à `TACHE3-V7` dans le code. La plupart ne s'activent qu'avec une propriété système, pour ne pas changer le comportement normal de Tika.
 
 ### V1 : TikaResource.java
 
@@ -78,11 +77,11 @@ static int countPreviousUploads(MultivaluedMap<String, String> httpHeaders) {
 }
 ```
 
-**Vulnérabilité :** injection SQL (CWE-89). La valeur de l'en-tête `X-Tika-User` est collée directement dans la requête, donc un client qui envoie `' OR '1'='1` change le sens de la requête.
+**Vulnérabilité :** injection SQL (CWE-89). L'en-tête `X-Tika-User` est collé dans la requête, donc `' OR '1'='1` en change le sens.
 
 **Règle :** `tache3-injection-sql`
 
-**Résultat Semgrep :** Semgrep signale la ligne 259 de `TikaResource.java`, l'argument `sql` de `stmt.executeQuery(sql)`, avec le message « Une valeur d'en-tete HTTP arrive dans une requete SQL : risque d'injection. Utilise un PreparedStatement avec un parametre (?). ».
+**Résultat Semgrep :** ligne 259, `stmt.executeQuery(sql)`.
 
 ### V2 : TikaResource.java
 
@@ -105,11 +104,11 @@ static void dumpForDebugging(TikaInputStream tis, MultivaluedMap<String, String>
 }
 ```
 
-**Vulnérabilité :** traversée de chemin (CWE-22). Le nom de fichier vient de l'en-tête `File-Name` et le code essaie de le nettoyer en retirant les `../`, mais ce filtre ne passe qu'une fois : `....//` redevient `../` après le remplacement. Un nom comme `....//....//home/tika/.bashrc` permet donc encore d'écrire hors du répertoire prévu.
+**Vulnérabilité :** traversée de chemin (CWE-22). Le filtre `replace("../", "")` ne passe qu'une fois, donc `....//` redevient `../` et permet d'écrire hors du répertoire prévu.
 
 **Règle :** `tache3-traversee-de-chemin`
 
-**Résultat Semgrep :** Semgrep signale la ligne 286 de `TikaResource.java`, `new File(dayDir, fileName)`, avec le message « Un nom de fichier venu d'un en-tete HTTP construit un chemin tel quel. Garde seulement le nom de base avec FilenameUtils.getName. ».
+**Résultat Semgrep :** ligne 286, `new File(dayDir, fileName)`.
 
 ### V3 : TikaResource.java
 
@@ -123,11 +122,11 @@ public String getHelloPage(@QueryParam("name") String name) {
 }
 ```
 
-**Vulnérabilité :** XSS réfléchi (CWE-79). Le paramètre `name` passe par la variable `displayName`, qui ne fait que le nettoyer des espaces, puis il est renvoyé sans échappement dans une page HTML, donc un lien comme `/tika/hello?name=<script>...</script>` fait exécuter du JavaScript dans le navigateur de la victime.
+**Vulnérabilité :** XSS réfléchi (CWE-79). Le paramètre `name` est renvoyé sans échappement dans du HTML, donc `?name=<script>...</script>` exécute du JavaScript chez la victime.
 
 **Règle :** `tache3-xss-reflechi`
 
-**Résultat Semgrep :** Semgrep signale les lignes 529 et 530 de `TikaResource.java`, la déclaration de `displayName` puis le `return`, avec le message « Un parametre de requete est renvoye sans echappement dans du HTML : XSS reflechi. Echappe la valeur (StringEscapeUtils.escapeHtml4) ou reponds en text/plain. ».
+**Résultat Semgrep :** lignes 529 et 530, la déclaration de `displayName` puis le `return`.
 
 ### V4 : TikaResource.java
 
@@ -144,28 +143,23 @@ static void mergeSerializedParseContext(InputStream in, ParseContext context) th
 }
 ```
 
-**Vulnérabilité :** désérialisation de données non fiables (CWE-502). La pièce jointe `config` envoyée par le client est lue avec `readObject()` sans filtre de classes, ce qui peut mener à l'exécution de code avec une chaîne de gadgets.
+**Vulnérabilité :** désérialisation non sûre (CWE-502). La configuration envoyée par le client est lue avec `readObject()` sans filtre, ce qui peut mener à l'exécution de code.
 
 **Règle :** `tache3-deserialisation`
 
-**Résultat Semgrep :** Semgrep signale la ligne 298 de `TikaResource.java`, `ois.readObject()`, avec le message « ObjectInputStream.readObject() sur des donnees recues du client : risque d'execution de code via une chaine de gadgets. N'accepte que du JSON. ».
+**Résultat Semgrep :** ligne 298, `ois.readObject()`.
 
 ### V5 : HttpFetcher.java
 
 ```java
 private static final String DEFAULT_JWT_SECRET = "tika-fetcher-2026-Sup3rS3cr3t!";
-
-} else if (Boolean.getBoolean("tika.http.useDefaultJwtSecret")) {
-    jwtGenerator = new JwtGenerator(new JwtSecretCreds(DEFAULT_JWT_SECRET.getBytes(StandardCharsets.UTF_8),
-            httpFetcherConfig.getJwtIssuer(), httpFetcherConfig.getJwtSubject(), httpFetcherConfig.getJwtExpiresInSeconds()));
-}
 ```
 
-**Vulnérabilité :** secret codé en dur (CWE-798). La clé qui signe les jetons JWT est écrite en clair dans un dépôt public, donc n'importe qui peut la lire et fabriquer des jetons valides.
+**Vulnérabilité :** secret codé en dur (CWE-798). La clé qui signe les JWT est en clair dans un dépôt public, donc n'importe qui peut fabriquer des jetons valides.
 
 **Règle :** `tache3-secret-en-dur`
 
-**Résultat Semgrep :** Semgrep signale la ligne 147 de `HttpFetcher.java`, la déclaration de `DEFAULT_JWT_SECRET`, avec le message « Un secret est ecrit en clair dans le code. Lis-le depuis une variable d'environnement ou un gestionnaire de secrets. ».
+**Résultat Semgrep :** ligne 147, la déclaration de `DEFAULT_JWT_SECRET`.
 
 ### V6 : HttpFetcher.java
 
@@ -180,11 +174,11 @@ private static String fingerprint(String url) {
 }
 ```
 
-**Vulnérabilité :** hachage faible (CWE-328). MD5 n'est plus résistant aux collisions, donc deux entrées différentes peuvent donner la même empreinte et l'empreinte ne garantit rien.
+**Vulnérabilité :** hachage faible (CWE-328). MD5 n'est plus résistant aux collisions, donc l'empreinte ne garantit rien.
 
 **Règle :** `tache3-hachage-faible`
 
-**Résultat Semgrep :** Semgrep signale la ligne 539 de `HttpFetcher.java`, `MessageDigest.getInstance("MD5")`, avec le message « MD5 et SHA-1 ne resistent plus aux collisions. Utilise SHA-256. ».
+**Résultat Semgrep :** ligne 539, `MessageDigest.getInstance("MD5")`.
 
 ### V7 : HttpFetcher.java
 
@@ -217,27 +211,27 @@ private static HttpClient buildTrustAllClient() throws TikaConfigException {
 }
 ```
 
-**Vulnérabilité :** validation TLS désactivée (CWE-295). Le `TrustManager` accepte n'importe quel certificat et le nom d'hôte n'est plus vérifié, donc une attaque de l'homme du milieu peut lire et modifier le trafic HTTPS.
+**Vulnérabilité :** validation TLS désactivée (CWE-295). Tout certificat est accepté et le nom d'hôte n'est plus vérifié, donc une attaque de l'homme du milieu peut lire le trafic HTTPS.
 
 **Règle :** `tache3-tls-sans-verification`
 
-**Résultat Semgrep :** deux résultats dans `HttpFetcher.java`, à la ligne 563 pour la méthode `checkServerTrusted` vide et à la ligne 571 pour `NoopHostnameVerifier.INSTANCE`, avec le message « La validation TLS est desactivee : un TrustManager accepte tout certificat, ou le nom d'hote n'est plus verifie. Risque d'attaque de l'homme du milieu. ».
+**Résultat Semgrep :** deux résultats, ligne 563 pour `checkServerTrusted` vide et ligne 571 pour `NoopHostnameVerifier.INSTANCE`.
 
 ### Comparaison des rapports avant et après
 
-À chaque exécution, le job publie le rapport complet de tout le dépôt comme artefact `semgrep-rapport` ; nous avons copié celui de l'exécution #9 dans [`tache3/rapports/`](tache3/rapports/), en [texte](tache3/rapports/semgrep-rapport-apres.txt) et en [JSON](tache3/rapports/semgrep-rapport-apres.json). Avec nos 7 règles et `p/java`, soit 67 règles, Semgrep y analyse 1475 fichiers et trouve 31 résultats. L'étape bloquante montre que seuls 10 d'entre eux sont nouveaux : ce sont exactement les 10 résultats de nos deux fichiers modifiés. Le rapport d'avant compte donc les 21 autres, qui existaient déjà dans Tika avant notre travail.
+Le rapport complet de l'exécution #9 est copié dans [`tache3/rapports/`](tache3/rapports/). Avec 67 règles (les nôtres et `p/java`), Semgrep y trouve 31 résultats dans 1475 fichiers. Le mode baseline montre que seuls 10 sont nouveaux, et ce sont exactement ceux de nos deux fichiers : le rapport d'avant compte donc les 21 autres.
 
-Les 10 nouveaux résultats se répartissent ainsi. Nos règles en donnent huit, une par vulnérabilité sauf V7 qui en donne deux, aux lignes indiquées dans la section précédente. `p/java` en ajoute deux de lui-même : `use-of-md5` retrouve notre V6 à la ligne 539 de `HttpFetcher.java`, et `weak-ssl-context` signale la ligne 567, où notre V7 crée le contexte avec `SSLContext.getInstance("TLS")` sans fixer de version minimale. Les autres vulnérabilités ne sont trouvées que par nos règles, ce qui justifie de les avoir écrites.
+Parmi les 10 nouveaux, huit viennent de nos règles (V7 en donne deux) et deux de `p/java` : `use-of-md5` retrouve notre V6, et `weak-ssl-context` signale le `SSLContext.getInstance("TLS")` de notre V7. Les autres vulnérabilités ne sont trouvées que par nos règles.
 
-Parmi les 21 résultats qui existaient déjà, dix viennent de nos propres règles, ce qui montre qu'elles décrivent bien des formes générales et pas seulement notre code. `tache3-tls-sans-verification` trouve deux usages réels de `NoopHostnameVerifier` dans `HttpClientFactory`, et `tache3-hachage-faible` y trouve un `MessageDigest.getInstance("SHA-1")`, que `p/java` signale aussi. En revanche, les sept résultats de `tache3-secret-en-dur` dans le code existant sont des faux positifs : ce sont des constantes dont le nom contient `TOKEN`, `PASSWORD` ou `SECRET`, comme `INPUT_FILE_TOKEN = "${INPUT_FILE}"`. C'est le prix d'une règle volontairement simple, basée sur une expression régulière ; grâce au mode baseline, ces faux positifs déjà présents ne bloquent jamais le build. Les 11 derniers viennent de `p/java` (sockets non chiffrés, analyseurs XML sans protection XXE, chaînes SQL formatées dans tika-eval, AES en mode ECB, SHA-1).
+Parmi les 21 anciens, nos règles trouvent aussi de vrais problèmes dans `HttpClientFactory` de Tika (deux `NoopHostnameVerifier` et un SHA-1). Les sept résultats de `tache3-secret-en-dur` dans le code existant sont en revanche des faux positifs, des constantes comme `INPUT_FILE_TOKEN` ; c'est le prix d'une règle simple, et la baseline les empêche de bloquer le build.
 
-Comparer deux rapports ligne par ligne ne suffirait pas, car l'ajout de code décale les numéros de ligne et un ancien résultat déplacé paraîtrait nouveau. Le mode baseline de Semgrep identifie plutôt chaque résultat par la règle, le fichier et le code trouvé, et ne garde que ceux qui n'existaient pas dans le commit de référence `af7aef4f2`. Le journal de l'étape bloquante de l'[exécution #9](https://github.com/Toky5/tika/actions/runs/44039199316/job/133889393920) se termine ainsi :
+Une comparaison ligne par ligne ne suffirait pas, car l'ajout de code décale les numéros de ligne. Le mode baseline compare plutôt la règle, le fichier et le code trouvé, et le journal de l'[exécution #9](https://github.com/Toky5/tika/actions/runs/44039199316/job/133889393920) liste exactement les nouvelles vulnérabilités :
 
 <p align="center"><img src="tache3/captures/journal-execution-9.png" alt="Fin du journal de l'étape bloquante de l'exécution #9"/></p>
 
 ## 3. Les règles YAML et la méthode utilisée
 
-Les règles sont dans [`tache3/semgrep/regles-tache3.yml`](tache3/semgrep/regles-tache3.yml). Trois d'entre elles restent simples, dans l'esprit des exemples de la tâche 1 : la désérialisation, le secret en dur et le hachage faible. Les quatre autres sont plus complexes, parce que le code qu'elles visent l'est aussi : l'injection SQL utilise le mode taint, la traversée de chemin écarte le bon nettoyage, le XSS suit la valeur à travers une variable, et le TLS fait de la correspondance structurelle. Ci-dessous, la partie de chaque règle qui fait la détection, avec une ligne qui dit la méthode.
+Trois règles sont simples (V4, V5, V6) et quatre plus complexes (V1, V2, V3, V7). Voici la partie de chaque règle qui fait la détection.
 
 ### tache3-injection-sql (V1), plus complexe
 
@@ -253,7 +247,7 @@ pattern-sinks:
       - focus-metavariable: $SQL
 ```
 
-**Méthode :** mode taint. La source est une valeur venue d'un en-tête HTTP, le puits est le texte passé à `executeQuery`, et Semgrep suit la donnée de l'une à l'autre même quand elle passe par une variable comme `sql`. `Integer.parseInt` arrête le suivi, car un nombre ne peut pas contenir d'injection.
+**Méthode :** mode taint. Semgrep suit la valeur de l'en-tête HTTP jusqu'au texte passé à `executeQuery`, même à travers la variable `sql`.
 
 ### tache3-traversee-de-chemin (V2), plus complexe
 
@@ -270,7 +264,7 @@ patterns:
       ...
 ```
 
-**Méthode :** `pattern-inside` et `pattern-not-inside`. La règle signale un chemin construit avec une variable remplie plus tôt par une valeur d'en-tête HTTP, et ne se tait que si la variable passe par `FilenameUtils.getName`. Un nettoyage maison comme `replace("../", "")` ne l'arrête donc pas, ce qui est voulu puisqu'il se contourne.
+**Méthode :** `pattern-inside` et `pattern-not-inside`. La règle signale un chemin construit avec une valeur d'en-tête et ne se tait que si elle passe par `FilenameUtils.getName`, donc le `replace("../", "")` ne la trompe pas.
 
 ### tache3-xss-reflechi (V3), plus complexe
 
@@ -294,7 +288,7 @@ patterns:
       ...
 ```
 
-**Méthode :** annotations, `metavariable-regex` et suite d'instructions. La règle se place dans une méthode qui reçoit un `@QueryParam`, et `metavariable-regex` ne garde que celles qui produisent du HTML, pour ne pas signaler les nombreux points d'entrée en `text/plain`. Elle trouve le paramètre renvoyé directement ou à travers une variable intermédiaire comme `displayName`, et elle se tait si la valeur est échappée avec `escapeHtml4`.
+**Méthode :** annotations, `metavariable-regex` et suite d'instructions. La règle ne garde que les méthodes qui produisent du HTML, suit le paramètre à travers une variable comme `displayName` et se tait s'il est échappé.
 
 ### tache3-deserialisation (V4)
 
@@ -302,7 +296,7 @@ patterns:
 pattern: (ObjectInputStream $OIS).readObject()
 ```
 
-**Méthode :** un seul motif avec une métavariable typée. Comme `$OIS` est typé `ObjectInputStream`, un flux protégé d'un autre type ne serait pas signalé.
+**Méthode :** un seul motif avec une métavariable typée.
 
 ### tache3-secret-en-dur (V5)
 
@@ -310,7 +304,7 @@ pattern: (ObjectInputStream $OIS).readObject()
 pattern-regex: '(?i)String\s+\w*(secret|password|token)\w*\s*=\s*"[^"]{12,}"'
 ```
 
-**Méthode :** une expression régulière. Un secret en dur se reconnaît à son texte, un nom qui évoque un secret suivi d'une longue valeur entre guillemets, donc une regex convient mieux qu'un motif de code.
+**Méthode :** une expression régulière, parce qu'un secret en dur se reconnaît à son texte.
 
 ### tache3-hachage-faible (V6)
 
@@ -320,7 +314,7 @@ pattern-either:
   - pattern: MessageDigest.getInstance("SHA-1")
 ```
 
-**Méthode :** deux motifs réunis par `pattern-either`. La règle signale directement l'appel à `getInstance` avec un algorithme cassé.
+**Méthode :** deux motifs réunis par `pattern-either`.
 
 ### tache3-tls-sans-verification (V7), plus complexe
 
@@ -332,11 +326,11 @@ pattern-either:
   - pattern: NoopHostnameVerifier.INSTANCE
 ```
 
-**Méthode :** correspondance structurelle. La règle entre dans une classe anonyme qui implémente `X509TrustManager` et cherche une méthode `checkServerTrusted` au corps vide, c'est-à-dire qui ne refuse jamais rien. Elle signale aussi `NoopHostnameVerifier`, donc cette vulnérabilité donne deux résultats.
+**Méthode :** correspondance structurelle. La règle cherche une méthode `checkServerTrusted` vide dans un `X509TrustManager`, et signale aussi `NoopHostnameVerifier`.
 
 ## 4. Les fix proposés
 
-Pour chaque vulnérabilité, nous proposons une correction. Nous ne l'avons pas appliquée dans le code, puisque l'énoncé demande que les vulnérabilités restent présentes, mais elle montre comment régler le problème. Chaque correction ne correspond plus au motif de la règle, donc Semgrep ne signalerait plus rien.
+Nous proposons une correction pour chaque vulnérabilité, sans l'appliquer puisque les vulnérabilités doivent rester dans le code.
 
 ### Fix V1 : requête paramétrée
 
@@ -351,38 +345,31 @@ try (Connection conn = DriverManager.getConnection(AUDIT_DB_URL);
 }
 ```
 
-Avec un `PreparedStatement`, la valeur de l'en-tête est envoyée comme une donnée et jamais comme du code SQL, donc `' OR '1'='1` est cherché tel quel comme nom d'utilisateur.
+La valeur est envoyée comme une donnée et jamais comme du SQL.
 
 ### Fix V2 : garder seulement le nom du fichier
 
 ```java
 String fileName = FilenameUtils.getName(httpHeaders.getFirst("File-Name"));
-if (fileName == null || fileName.isEmpty()) {
-    return;
-}
-File target = new File(dayDir, fileName);
 ```
 
-On remplace le `replace("../", "")` par `FilenameUtils.getName` (commons-io, déjà utilisé par Tika), qui enlève tous les répertoires du nom au lieu de chercher un motif précis. `....//....//home/tika/.bashrc` devient `.bashrc` et le fichier reste dans le répertoire prévu.
+`FilenameUtils.getName` enlève tous les répertoires du nom, donc le fichier reste dans le répertoire prévu.
 
 ### Fix V3 : échapper le HTML
 
 ```java
 String displayName = (name == null || name.isBlank()) ? "visiteur" : StringEscapeUtils.escapeHtml4(name.trim());
-return "<html><body><h1>Bonjour " + displayName + " !</h1><p>" + GREETING + "</p></body></html>";
 ```
 
-`escapeHtml4` transforme `<` et `>` en `&lt;` et `&gt;`, donc le navigateur affiche le script comme du texte au lieu de l'exécuter. Il faut ajouter la dépendance commons-text à tika-server-core ; l'autre option est de répondre en `text/plain`.
+Le navigateur affiche le script comme du texte au lieu de l'exécuter (il faut ajouter commons-text à tika-server-core).
 
 ### Fix V4 : filtrer les classes désérialisées
 
 ```java
-try (ObjectInputStream ois = new ObjectInputStream(in)) {
-    ois.setObjectInputFilter(ObjectInputFilter.Config.createFilter("java.util.HashMap;java.lang.String;!*"));
-    Map<String, Object> entries = (Map<String, Object>) ois.readObject();
+ois.setObjectInputFilter(ObjectInputFilter.Config.createFilter("java.util.HashMap;java.lang.String;!*"));
 ```
 
-Le filtre refuse toute classe qui n'est pas dans la liste avant même de la construire, ce qui bloque les chaînes de gadgets. La solution la plus sûre reste de supprimer ce format et de n'accepter que la configuration en JSON, comme avant.
+Le filtre refuse toute classe hors de la liste ; le plus sûr reste de n'accepter que du JSON.
 
 ### Fix V5 : lire le secret dans l'environnement
 
@@ -391,11 +378,9 @@ String secret = System.getenv("TIKA_HTTP_JWT_SECRET");
 if (StringUtils.isBlank(secret)) {
     throw new TikaConfigException("TIKA_HTTP_JWT_SECRET is not set");
 }
-jwtGenerator = new JwtGenerator(new JwtSecretCreds(secret.getBytes(StandardCharsets.UTF_8),
-        httpFetcherConfig.getJwtIssuer(), httpFetcherConfig.getJwtSubject(), httpFetcherConfig.getJwtExpiresInSeconds()));
 ```
 
-Le secret n'est plus dans le code : il est donné au démarrage par une variable d'environnement, et le fetcher refuse de démarrer s'il manque au lieu de prendre une valeur par défaut.
+Le secret n'est plus dans le code, et le fetcher refuse de démarrer s'il manque.
 
 ### Fix V6 : utiliser SHA-256
 
@@ -403,7 +388,7 @@ Le secret n'est plus dans le code : il est donné au démarrage par une variable
 MessageDigest md = MessageDigest.getInstance("SHA-256");
 ```
 
-SHA-256 n'a pas de collision connue, donc l'empreinte identifie vraiment l'URL.
+SHA-256 n'a pas de collision connue.
 
 ### Fix V7 : garder la vérification TLS
 
@@ -411,22 +396,18 @@ SHA-256 n'a pas de collision connue, donc l'empreinte identifie vraiment l'URL.
 SSLContext sslContext = SSLContexts.custom()
         .loadTrustMaterial(new File(System.getProperty("tika.http.truststore")), null)
         .build();
-return HttpClients.custom()
-        .setSSLContext(sslContext)
-        .build();
+return HttpClients.custom().setSSLContext(sslContext).build();
 ```
 
-Au lieu de tout accepter, on ajoute seulement le certificat dont on a besoin dans un magasin de confiance, et on garde le vérificateur de nom d'hôte par défaut. Si aucun certificat interne n'est nécessaire, il suffit de supprimer l'option et de garder le client HTTP normal.
+On n'ajoute que le certificat nécessaire dans un magasin de confiance et on garde la vérification du nom d'hôte.
 
 ## 5. Côté humour
 
 <p align="center"><img src="https://imgs.search.brave.com/a5qZcBdpt87uvrss2IscJMnalBG7sPExUD_IvGy2Ics/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9lZmIy/OC53b3JkcHJlc3Mu/Y29tL3dwLWNvbnRl/bnQvdXBsb2Fkcy8y/MDE0LzA0L3NwYWNl/YmFsbHNfbHVkaWNy/b3VzX3NwZWVkLmpw/Zz93PTMwMCZoPTE2/MA" height="250" alt="Mème Ludicrous speed, tiré du film Spaceballs"/></p>
 
-Semgrep promet d'analyser le code à la vitesse *ludicrous*. Notre CI, elle, échoue maintenant à la vitesse ludicrous dès qu'une vulnérabilité se pointe. Mais un build rouge, c'est triste : un X rouge, trois kilomètres de journal Maven et l'envie de tout lâcher. Nous avons donc décidé que la CI de Tika devait faire une promesse à ses développeurs : ne jamais les laisser tomber, ne jamais les laisser déprimer devant un test qui échoue.
+Semgrep analyse le code à la vitesse *ludicrous* ; notre CI, elle, échoue maintenant à la vitesse ludicrous. Mais un build rouge, c'est triste, alors nous avons voulu que la CI promette à ses développeurs de ne jamais les laisser tomber.
 
-Au départ, nous voulions utiliser l'action `random-rickroll` telle quelle. Petit problème : elle ne sait parler qu'aux issues, et quand un test échoue après un push, il n'y a personne à qui parler. Elle abandonne alors avec un triste « No issue found », et en plus elle tourne sur Node 12, que GitHub a mis à la retraite. Nous avons donc écrit notre propre version, qui garde son esprit et son paramètre `percentage`, mais qui sait consoler quelqu'un qui vient de casser un test.
-
-Le workflow l'appelle juste après les tests, seulement s'ils ont échoué :
+L'action `random-rickroll` ne sait parler qu'aux issues : après un test raté, elle abandonne avec « No issue found », et elle tourne sur Node 12, que GitHub ne supporte plus. Nous avons donc écrit notre propre version, qui garde son paramètre `percentage` et que le workflow appelle seulement si les tests échouent :
 
 ```yaml
       - name: Rapport de diagnostic si un test echoue
@@ -436,56 +417,24 @@ Le workflow l'appelle juste après les tests, seulement s'ils ont échoué :
           percentage: 100
 ```
 
-L'action commence par tirer un nombre au hasard entre 0 et 99 et le compare à `percentage`. Avec 100, personne n'y échappe, et le journal affiche fièrement « Gottem!! ». Elle ajoute ensuite au résumé de l'exécution un « rapport de diagnostic de l'échec » très détaillé, avec une animation et un lien vers une explication vidéo, puis une annotation d'erreur qui invite poliment à le consulter. Si l'échec arrive dans une pull request, elle publie aussi le rapport en commentaire, pour que toute l'équipe profite du diagnostic.
+Avec `percentage: 100`, personne n'y échappe. L'action ajoute au résumé de l'exécution un « rapport de diagnostic » très détaillé, avec une animation et un lien vers une explication vidéo, et le publie en commentaire si l'échec arrive dans une pull request. Le workflow `rickroll.yml` fait la même chose à l'ouverture d'une issue, pour que personne ne soit obligé de casser un test pour en profiter.
 
-Comme nous ne voulions obliger personne à casser un test pour profiter du diagnostic, un deuxième workflow, `rickroll.yml`, se déclenche à l'ouverture de n'importe quelle issue sur le dépôt. Il appelle la même action, toujours avec `percentage: 100`, et celle-ci répond aussitôt par un commentaire dans l'issue. C'est d'ailleurs le retour aux sources : l'action `random-rickroll` d'origine était faite pour les issues.
+Nous ne dirons pas ce que contient la vidéo, seulement qu'elle date de 1987. Pour le tester, nous avons ouvert une pull request qui casse une assertion de `MediaTypeTest` (exécution #11), puis nous l'avons fermée sans la fusionner.
 
-```yaml
-on:
-  issues:
-    types: [opened]
+<p align="center"><img src="tache3/captures/rickroll-test-casse.png" height="500" alt="Exécution #11 : semgrep réussit, build échoue, le rapport de diagnostic s'affiche"/></p>
 
-jobs:
-  diagnostic:
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - uses: actions/checkout@v6
-      - name: Rapport de diagnostic
-        uses: ./.github/actions/rickroll
-        with:
-          percentage: 100
-```
-
-```bash
-if [ $((RANDOM % 100)) -ge "$PERCENTAGE" ]; then
-  echo "Fine, you win this time."
-  exit 0
-fi
-echo "Gottem!!"
-echo "::error title=Un test a echoue::Un rapport de diagnostic detaille est disponible : $VIDEO"
-echo "$RAPPORT" >> "$GITHUB_STEP_SUMMARY"
-```
-
-Nous ne dirons pas ce que contient la vidéo. Disons seulement qu'elle est très populaire, qu'elle date de 1987 et que tout développeur devrait la voir au moins une fois. Pour le découvrir, il suffit de casser un test, ou plus simplement d'ouvrir une issue sur notre dépôt. Nous vous le recommandons vivement.
-
-Nous avons bien sûr testé les deux déclencheurs sur nous-mêmes. Pour le test raté, nous avons ouvert une pull request (exécution #11) qui casse volontairement une assertion de `MediaTypeTest` en attendant `"text/rickroll"` au lieu de `"text/plain"`. Le job `semgrep` passe, puisqu'un test modifié n'ajoute aucune vulnérabilité, puis `build` échoue et le diagnostic s'affiche aussitôt dans le résumé de l'exécution. Nous avons ensuite fermé la pull request sans la fusionner, Rick n'ayant pas sa place dans les types MIME officiels.
-
-<p align="center"><img src="tache3/captures/rickroll-test-casse.png" height="500" alt="Résumé de l'exécution #11 : semgrep réussit, build échoue, le rapport de diagnostic s'affiche"/></p>
-
-Pour l'issue, le diagnostic est arrivé en commentaire quelques secondes après l'ouverture, ce qui est un excellent temps de réponse pour un service d'assistance.
+Pour l'issue, le diagnostic arrive en commentaire en quelques secondes.
 
 <p align="center"><img src="tache3/captures/rickroll-issue.png" height="500" alt="Le rapport de diagnostic publié en commentaire d'une issue"/></p>
 
-Vous pouvez faire l'essai vous-même en [ouvrant une issue sur notre dépôt](https://github.com/Toky5/tika/issues/new). Promis, nous ne vous laisserons jamais tomber.
+Essayez vous-même en [ouvrant une issue sur notre dépôt](https://github.com/Toky5/tika/issues/new). Promis, nous ne vous laisserons jamais tomber.
 
 ## 6. Crédits
 
-Ce rapport et le code qui l'accompagne ont été réalisés avec l'aide de l'assistant d'IA Claude (Anthropic). Nous l'avons utilisé pour écrire les règles Semgrep, le job du workflow, l'action de diagnostic et le code des vulnérabilités, et pour rédiger une première version de ce rapport ; nous avons ensuite relu, simplifié, testé et corrigé l'ensemble nous-mêmes.
+Ce travail a été réalisé avec l'aide de l'assistant d'IA Claude (Anthropic) dans les taches les plus dure.
 
-Le logo et le slogan « Code scanning at ludicrous speed. » affichés en haut du rapport viennent du README du dépôt open source de Semgrep, [github.com/semgrep/semgrep](https://github.com/semgrep/semgrep), distribué sous licence LGPL 2.1 ; l'image est chargée directement depuis ce dépôt ([`images/semgrep-logo-dark.svg`](https://github.com/semgrep/semgrep/raw/develop/images/semgrep-logo-dark.svg)). Le slogan lui-même est un clin d'œil au film *Spaceballs* de Mel Brooks (1987), d'où vient aussi le mème « Ludicrous speed » de la section 5 ; cette image provient du blogue [efb28.wordpress.com](https://efb28.wordpress.com/wp-content/uploads/2014/04/spaceballs_ludicrous_speed.jpg), et nous l'affichons à travers le cache d'images de Brave Search.
+Le logo et le slogan viennent du dépôt [semgrep/semgrep](https://github.com/semgrep/semgrep) (licence LGPL 2.1). Le slogan fait référence au film *Spaceballs* de Mel Brooks (1987), d'où vient aussi le mème de la section 5, tiré du blogue [efb28.wordpress.com](https://efb28.wordpress.com/wp-content/uploads/2014/04/spaceballs_ludicrous_speed.jpg) et affiché par le cache d'images de Brave Search.
 
-Notre action de diagnostic s'inspire de l'action [`TejasvOnly/random-rickroll`](https://github.com/TejasvOnly/random-rickroll) de Tejasv Sharma, publiée sous licence Apache 2.0. Nous en reprenons l'idée, le paramètre `percentage`, les messages « Gottem!! » et « Fine, you win this time. », ainsi que l'animation, hébergée sur `user-images.githubusercontent.com`. La vidéo vers laquelle pointe le diagnostic est hébergée sur YouTube ; par respect pour la blague, nous laissons au lecteur le plaisir de découvrir de quel clip de 1987 il s'agit.
+Notre action s'inspire de [`TejasvOnly/random-rickroll`](https://github.com/TejasvOnly/random-rickroll) de Tejasv Sharma (licence Apache 2.0), dont nous reprenons l'idée, le paramètre `percentage`, les messages et l'animation. La vidéo est hébergée sur YouTube ; nous vous laissons découvrir laquelle.
 
-Pour les règles et le workflow, nous nous sommes appuyés sur la [documentation de Semgrep](https://semgrep.dev/docs/), en particulier les pages sur la syntaxe des règles, le mode taint et l'option `--baseline-commit`, ainsi que sur le jeu de règles public [`p/java`](https://semgrep.dev/p/java) et sur nos propres exemples de la tâche 1 ([github.com/Toky5/-semgrep-ift3913](https://github.com/Toky5/-semgrep-ift3913)). Les catégories de vulnérabilités suivent la liste [CWE](https://cwe.mitre.org/) de MITRE et le [Top 10 de l'OWASP](https://owasp.org/Top10/). Le code modifié est celui d'[Apache Tika](https://github.com/apache/tika), sous licence Apache 2.0, et la tâche suit l'énoncé du cours IFT3913 de l'Université de Montréal.
+Nous nous sommes appuyés sur la [documentation de Semgrep](https://semgrep.dev/docs/), le jeu de règles [`p/java`](https://semgrep.dev/p/java), nos exemples de la tâche 1 ([Toky5/-semgrep-ift3913](https://github.com/Toky5/-semgrep-ift3913)), la liste [CWE](https://cwe.mitre.org/) et le [Top 10 de l'OWASP](https://owasp.org/Top10/). Le code modifié est celui d'[Apache Tika](https://github.com/apache/tika) (licence Apache 2.0), et la tâche suit l'énoncé du cours IFT3913 de l'Université de Montréal.
