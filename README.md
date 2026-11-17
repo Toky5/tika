@@ -42,7 +42,10 @@ C'est le workflow GitHub Actions qui compile et teste tika-core, et nous y avons
 
 **Choix de conception :** nous avons ajouté le job au workflow existant plutôt que d'en créer un nouveau, parce que l'énoncé demande que le processus de build lui-même échoue ; avec `needs: semgrep`, la compilation et les tests ne démarrent même pas. Le mode baseline est indispensable, car Tika contient déjà du code que Semgrep signale, et sans lui le workflow serait rouge en permanence. Le commit de référence est la base de la pull request pour une pull request, le commit d'avant le push pour un push, et le parent du commit (`HEAD~1`) pour un lancement manuel ou le premier push d'une branche ; le checkout récupère tout l'historique (`fetch-depth: 0`) pour que ce commit soit disponible. L'analyse combine nos règles et le jeu public `p/java`, pour que le build échoue sur toute nouvelle vulnérabilité détectée par Semgrep et pas seulement sur les nôtres, et Semgrep est installé à chaque exécution dans une plage de versions fixée (`>=1.100,<2`) pour éviter qu'une mise à jour majeure casse le workflow. Le rapport complet est publié avant l'étape bloquante, donc il reste disponible même quand celle-ci échoue.
 
-**Validation :** nous avons validé le workflow avec trois commits successifs. Le premier n'ajoute que les règles et le workflow, sans toucher au code de Tika : le job `semgrep` doit passer, puisque les résultats déjà présents dans Tika font partie de la référence. *[À compléter : lien vers l'exécution.]* Le deuxième ajoute les sept vulnérabilités : le job doit échouer en listant les nouveaux résultats, et le build doit être ignoré. *[À compléter : lien vers l'exécution.]* Le troisième ne modifie que de la documentation : le job doit repasser au vert, car les vulnérabilités du commit précédent font maintenant partie de la référence, ce qui montre que seul le nouveau code bloque le build. *[À compléter : lien vers l'exécution.]* Avant de pousser, nous avons aussi lancé nos règles en local sur les deux fichiers modifiés, avec `semgrep scan --config tache3/semgrep` suivi des deux chemins. *[À compléter : nombre de résultats obtenus.]*
+**Validation :** comme les Actions étaient désactivées sur notre fork au moment où nous avons poussé le travail, nous avons rejoué la validation une fois les Actions activées, avec deux commits qui retirent puis remettent les vulnérabilités. Le premier, un `git revert` du commit des vulnérabilités, correspond à l'état « avant » : les règles et le workflow sont là, mais le code de Tika est intact. Dans l'exécution #8 du workflow [`tache2`](https://github.com/Toky5/tika/actions/workflows/tache2.yml), le job `semgrep` passe et le build réussit, puisque retirer du code n'ajoute aucune vulnérabilité. Le second commit remet les vulnérabilités ; dans l'[exécution #9](https://github.com/Toky5/tika/actions/runs/44039199316), le job `semgrep` échoue avec dix nouveaux résultats marqués « Blocking », et le build ne démarre pas. Le commit suivant, qui ne touche qu'à ce README, doit repasser au vert, car les vulnérabilités font maintenant partie du commit de référence ; cela montre que seul le code nouvellement introduit bloque le build. On peut reproduire l'analyse en local avec `semgrep scan --config tache3/semgrep` suivi des chemins des deux fichiers modifiés.
+
+<p align="center"><img src="tache3/captures/liste-executions.png" alt="Liste des exécutions : #8 réussie, #9 en échec"/></p>
+<p align="center"><em>L'exécution #8 (vulnérabilités retirées) réussit, l'exécution #9 (vulnérabilités remises) échoue.</em></p>
 
 ### rickroll/action.yml
 
@@ -79,7 +82,7 @@ static int countPreviousUploads(MultivaluedMap<String, String> httpHeaders) {
 
 **Règle :** `tache3-injection-sql`
 
-**Résultat Semgrep :** *[À compléter : ligne signalée et message.]*
+**Résultat Semgrep :** Semgrep signale la ligne 259 de `TikaResource.java`, l'argument `sql` de `stmt.executeQuery(sql)`, avec le message « Une valeur d'en-tete HTTP arrive dans une requete SQL : risque d'injection. Utilise un PreparedStatement avec un parametre (?). ».
 
 ### V2 : TikaResource.java
 
@@ -106,7 +109,7 @@ static void dumpForDebugging(TikaInputStream tis, MultivaluedMap<String, String>
 
 **Règle :** `tache3-traversee-de-chemin`
 
-**Résultat Semgrep :** *[À compléter : ligne signalée et message.]*
+**Résultat Semgrep :** Semgrep signale la ligne 286 de `TikaResource.java`, `new File(dayDir, fileName)`, avec le message « Un nom de fichier venu d'un en-tete HTTP construit un chemin tel quel. Garde seulement le nom de base avec FilenameUtils.getName. ».
 
 ### V3 : TikaResource.java
 
@@ -124,7 +127,7 @@ public String getHelloPage(@QueryParam("name") String name) {
 
 **Règle :** `tache3-xss-reflechi`
 
-**Résultat Semgrep :** *[À compléter : ligne signalée et message.]*
+**Résultat Semgrep :** Semgrep signale les lignes 529 et 530 de `TikaResource.java`, la déclaration de `displayName` puis le `return`, avec le message « Un parametre de requete est renvoye sans echappement dans du HTML : XSS reflechi. Echappe la valeur (StringEscapeUtils.escapeHtml4) ou reponds en text/plain. ».
 
 ### V4 : TikaResource.java
 
@@ -145,7 +148,7 @@ static void mergeSerializedParseContext(InputStream in, ParseContext context) th
 
 **Règle :** `tache3-deserialisation`
 
-**Résultat Semgrep :** *[À compléter : ligne signalée et message.]*
+**Résultat Semgrep :** Semgrep signale la ligne 298 de `TikaResource.java`, `ois.readObject()`, avec le message « ObjectInputStream.readObject() sur des donnees recues du client : risque d'execution de code via une chaine de gadgets. N'accepte que du JSON. ».
 
 ### V5 : HttpFetcher.java
 
@@ -162,7 +165,7 @@ private static final String DEFAULT_JWT_SECRET = "tika-fetcher-2026-Sup3rS3cr3t!
 
 **Règle :** `tache3-secret-en-dur`
 
-**Résultat Semgrep :** *[À compléter : ligne signalée et message.]*
+**Résultat Semgrep :** Semgrep signale la ligne 147 de `HttpFetcher.java`, la déclaration de `DEFAULT_JWT_SECRET`, avec le message « Un secret est ecrit en clair dans le code. Lis-le depuis une variable d'environnement ou un gestionnaire de secrets. ».
 
 ### V6 : HttpFetcher.java
 
@@ -181,7 +184,7 @@ private static String fingerprint(String url) {
 
 **Règle :** `tache3-hachage-faible`
 
-**Résultat Semgrep :** *[À compléter : ligne signalée et message.]*
+**Résultat Semgrep :** Semgrep signale la ligne 539 de `HttpFetcher.java`, `MessageDigest.getInstance("MD5")`, avec le message « MD5 et SHA-1 ne resistent plus aux collisions. Utilise SHA-256. ».
 
 ### V7 : HttpFetcher.java
 
@@ -218,13 +221,19 @@ private static HttpClient buildTrustAllClient() throws TikaConfigException {
 
 **Règle :** `tache3-tls-sans-verification`
 
-**Résultat Semgrep :** deux résultats sont attendus, un pour le `TrustManager` et un pour `NoopHostnameVerifier`. *[À compléter : lignes signalées et messages.]*
+**Résultat Semgrep :** deux résultats dans `HttpFetcher.java`, à la ligne 563 pour la méthode `checkServerTrusted` vide et à la ligne 571 pour `NoopHostnameVerifier.INSTANCE`, avec le message « La validation TLS est desactivee : un TrustManager accepte tout certificat, ou le nom d'hote n'est plus verifie. Risque d'attaque de l'homme du milieu. ».
 
 ### Comparaison des rapports avant et après
 
-À chaque exécution, le job publie un rapport complet, sans baseline, comme artefact `semgrep-rapport`. Nous avons donc un rapport « avant », produit sur le commit qui n'ajoute que les règles et le workflow, et un rapport « après », produit sur le commit qui ajoute les vulnérabilités, tous deux avec exactement la même configuration. *[À compléter : liens vers les deux artefacts.]* Le rapport avant compte *[à compléter]* résultats, tous déjà présents dans Tika avant notre travail. Le rapport après en compte *[à compléter]* : nos règles en ajoutent huit, une par vulnérabilité sauf V7 qui en donne deux, et `p/java` en ajoute *[à compléter]*.
+À chaque exécution, le job publie le rapport complet de tout le dépôt comme artefact `semgrep-rapport` ; nous avons copié celui de l'exécution #9 dans [`tache3/rapports/`](tache3/rapports/), en [texte](tache3/rapports/semgrep-rapport-apres.txt) et en [JSON](tache3/rapports/semgrep-rapport-apres.json). Avec nos 7 règles et `p/java`, soit 67 règles, Semgrep y analyse 1475 fichiers et trouve 31 résultats. L'étape bloquante montre que seuls 10 d'entre eux sont nouveaux : ce sont exactement les 10 résultats de nos deux fichiers modifiés. Le rapport d'avant compte donc les 21 autres, qui existaient déjà dans Tika avant notre travail.
 
-Comparer les deux rapports ligne par ligne ne suffit pas, car l'ajout de code décale les numéros de ligne et un ancien résultat déplacé paraîtrait nouveau. Le mode baseline de Semgrep identifie plutôt chaque résultat par la règle, le fichier et le code trouvé. Le journal de l'étape bloquante du commit « après » donne donc exactement la liste des vulnérabilités nouvellement introduites, et c'est lui qui fait échouer le build. *[À compléter : extrait du journal.]*
+Les 10 nouveaux résultats se répartissent ainsi. Nos règles en donnent huit, une par vulnérabilité sauf V7 qui en donne deux, aux lignes indiquées dans la section précédente. `p/java` en ajoute deux de lui-même : `use-of-md5` retrouve notre V6 à la ligne 539 de `HttpFetcher.java`, et `weak-ssl-context` signale la ligne 567, où notre V7 crée le contexte avec `SSLContext.getInstance("TLS")` sans fixer de version minimale. Les autres vulnérabilités ne sont trouvées que par nos règles, ce qui justifie de les avoir écrites.
+
+Parmi les 21 résultats qui existaient déjà, dix viennent de nos propres règles, ce qui montre qu'elles décrivent bien des formes générales et pas seulement notre code. `tache3-tls-sans-verification` trouve deux usages réels de `NoopHostnameVerifier` dans `HttpClientFactory`, et `tache3-hachage-faible` y trouve un `MessageDigest.getInstance("SHA-1")`, que `p/java` signale aussi. En revanche, les sept résultats de `tache3-secret-en-dur` dans le code existant sont des faux positifs : ce sont des constantes dont le nom contient `TOKEN`, `PASSWORD` ou `SECRET`, comme `INPUT_FILE_TOKEN = "${INPUT_FILE}"`. C'est le prix d'une règle volontairement simple, basée sur une expression régulière ; grâce au mode baseline, ces faux positifs déjà présents ne bloquent jamais le build. Les 11 derniers viennent de `p/java` (sockets non chiffrés, analyseurs XML sans protection XXE, chaînes SQL formatées dans tika-eval, AES en mode ECB, SHA-1).
+
+Comparer deux rapports ligne par ligne ne suffirait pas, car l'ajout de code décale les numéros de ligne et un ancien résultat déplacé paraîtrait nouveau. Le mode baseline de Semgrep identifie plutôt chaque résultat par la règle, le fichier et le code trouvé, et ne garde que ceux qui n'existaient pas dans le commit de référence `af7aef4f2`. Le journal de l'étape bloquante de l'[exécution #9](https://github.com/Toky5/tika/actions/runs/44039199316/job/133889393920) se termine ainsi :
+
+<p align="center"><img src="tache3/captures/journal-execution-9.png" alt="Fin du journal de l'étape bloquante de l'exécution #9"/></p>
 
 ## 3. Les règles YAML et la méthode utilisée
 
@@ -461,7 +470,7 @@ echo "$RAPPORT" >> "$GITHUB_STEP_SUMMARY"
 
 Nous ne dirons pas ce que contient la vidéo. Disons seulement qu'elle est très populaire, qu'elle date de 1987 et que tout développeur devrait la voir au moins une fois. Pour le découvrir, il suffit de casser un test, ou plus simplement d'ouvrir une issue sur notre dépôt. Nous vous le recommandons vivement.
 
-*[À compléter : capture d'écran du commentaire laissé dans une issue de test, et du résumé d'une exécution où nous avons cassé exprès une assertion d'un test de tika-core.]*
+Pour le vérifier, il suffit d'[ouvrir une issue sur notre dépôt](https://github.com/Toky5/tika/issues/new) : le diagnostic arrive en commentaire quelques secondes plus tard.
 
 ## 6. Crédits
 

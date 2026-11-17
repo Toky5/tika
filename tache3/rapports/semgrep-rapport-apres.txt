@@ -1,0 +1,296 @@
+               
+               
+┌─────────────┐
+│ Scan Status │
+└─────────────┘
+  Scanning 2948 files tracked by git with 67 Code rules:
+  Scanning 1475 files with 67 java rules.
+                    
+                    
+┌──────────────────┐
+│ 31 Code Findings │
+└──────────────────┘
+                                                                          
+    tika-core/src/main/java/org/apache/tika/embedder/ExternalEmbedder.java
+    ❯❱ tache3.semgrep.tache3-secret-en-dur
+          ❰❰ Blocking ❱❱
+          Un secret est ecrit en clair dans le code. Lis-le depuis une variable d'environnement ou un
+          gestionnaire de secrets.                                                                   
+                                                                                                     
+           63┆ public static final String METADATA_COMMAND_ARGUMENTS_SERIALIZED_TOKEN =
+           64┆         "${METADATA_SERIALIZED}";
+                                                                               
+    tika-core/src/main/java/org/apache/tika/metadata/OfficeOpenXMLExtended.java
+    ❯❱ tache3.semgrep.tache3-secret-en-dur
+          ❰❰ Blocking ❱❱
+          Un secret est ecrit en clair dans le code. Lis-le depuis une variable d'environnement ou un
+          gestionnaire de secrets.                                                                   
+                                                                                                     
+           39┆ String SECURITY_PASSWORD_PROTECTED = "PasswordProtected";
+                                                                     
+    tika-core/src/main/java/org/apache/tika/mime/MimeTypesReader.java
+   ❯❯❱ java.lang.security.audit.xxe.saxparserfactory-disallow-doctype-decl-missing.saxparserfactory-disallow-doctype-
+       decl-missing                                                                                                  
+          ❰❰ Blocking ❱❱
+          DOCTYPE declarations are enabled for this SAXParserFactory. This is vulnerable to XML external      
+          entity attacks. Disable this by setting the feature `http://apache.org/xml/features/disallow-       
+          doctype-decl` to true. Alternatively, allow DOCTYPE declarations and only prohibit external entities
+          declarations. This can be done by setting the features `http://xml.org/sax/features/external-       
+          general-entities` and `http://xml.org/sax/features/external-parameter-entities` to false. NOTE - The
+          previous links are not meant to be clicked. They are the literal config key values that are supposed
+          to be used to disable these features. For more information, see https://semgrep.dev/docs/cheat-     
+          sheets/java-xxe/#3a-documentbuilderfactory.                                                         
+          Details: https://sg.run/Gj32                                                                        
+                                                                                                              
+           ▶▶┆ Autofix ▶ factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+              factory.newSAXParser();                                                                     
+          223┆ return factory.newSAXParser();
+                                                                     
+    tika-core/src/main/java/org/apache/tika/parser/NetworkParser.java
+    ❯❱ java.lang.security.audit.crypto.unencrypted-socket.unencrypted-socket
+          ❰❰ Blocking ❱❱
+          Detected use of a Java socket that is not encrypted. As a result, the traffic could be read by an
+          attacker intercepting the network traffic. Use an SSLSocket created by 'SSLSocketFactory' or     
+          'SSLServerSocketFactory' instead.                                                                
+          Details: https://sg.run/W8zA                                                                     
+                                                                                                           
+           68┆ try (Socket socket = new Socket(uri.getHost(), uri.getPort())) {
+                                                                               
+    tika-core/src/main/java/org/apache/tika/parser/external/ExternalParser.java
+    ❯❱ tache3.semgrep.tache3-secret-en-dur
+          ❰❰ Blocking ❱❱
+          Un secret est ecrit en clair dans le code. Lis-le depuis une variable d'environnement ou un
+          gestionnaire de secrets.                                                                   
+                                                                                                     
+           75┆ public static final String INPUT_FILE_TOKEN = "${INPUT_FILE}";
+            ⋮┆----------------------------------------
+           77┆ public static final String OUTPUT_FILE_TOKEN = "${OUTPUT_FILE}";
+                                                                     
+    tika-core/src/main/java/org/apache/tika/utils/XMLReaderUtils.java
+    ❯❱ java.lang.security.xmlinputfactory-possible-xxe.xmlinputfactory-possible-xxe
+          ❰❰ Blocking ❱❱
+          XML external entities are not explicitly disabled for this XMLInputFactory. This could be vulnerable
+          to XML external entity vulnerabilities. Explicitly disable external entities by setting             
+          "javax.xml.stream.isSupportingExternalEntities" to false.                                           
+          Details: https://sg.run/XBwA                                                                        
+                                                                                                              
+          307┆ XMLInputFactory factory = XMLInputFactory.newFactory();
+                                                                                 
+    tika-eval/tika-eval-app/src/main/java/org/apache/tika/eval/app/db/H2Util.java
+   ❯❯❱ java.lang.security.audit.formatted-sql-string.formatted-sql-string
+          ❰❰ Blocking ❱❱
+          Detected a formatted string in a SQL statement. This could lead to SQL injection if variables in the
+          SQL statement are not properly sanitized. Use a prepared statements (java.sql.PreparedStatement)    
+          instead. You can obtain a PreparedStatement using 'connection.prepareStatement'.                    
+          Details: https://sg.run/OPXp                                                                        
+                                                                                                              
+           70┆ boolean success = st.execute(sql);
+                                                                                   
+    tika-eval/tika-eval-app/src/main/java/org/apache/tika/eval/app/db/JDBCUtil.java
+   ❯❯❱ java.lang.security.audit.formatted-sql-string.formatted-sql-string
+          ❰❰ Blocking ❱❱
+          Detected a formatted string in a SQL statement. This could lead to SQL injection if variables in the
+          SQL statement are not properly sanitized. Use a prepared statements (java.sql.PreparedStatement)    
+          instead. You can obtain a PreparedStatement using 'connection.prepareStatement'.                    
+          Details: https://sg.run/OPXp                                                                        
+                                                                                                              
+          184┆ return st.execute(sql);
+                                                                                                        
+    tika-eval/tika-eval-core/src/main/java/org/apache/tika/eval/core/tokens/CommonTokenCountManager.java
+    ❯❱ tache3.semgrep.tache3-secret-en-dur
+          ❰❰ Blocking ❱❱
+          Un secret est ecrit en clair dans le code. Lis-le depuis une variable d'environnement ou un
+          gestionnaire de secrets.                                                                   
+                                                                                                     
+           39┆ static final String COMMON_TOKENS_BLOOM_PATH = "/common_tokens_bloom/";
+                                                                                                                        
+    tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-miscoffice-module/src/main/java/org/apa
+  che/tika/parser/hwp/HwpTextExtractorV5.java                                                                           
+    ❯❱ java.lang.security.audit.crypto.use-of-aes-ecb.use-of-aes-ecb
+          ❰❰ Blocking ❱❱
+          Use of AES with ECB mode detected. ECB doesn't provide message confidentiality and  is not
+          semantically secure so should not be used. Instead, use a strong, secure cipher:          
+          Cipher.getInstance("AES/CBC/PKCS7PADDING"). See https://owasp.org/www-                    
+          community/Using_the_Java_Cryptographic_Extensions for more information.                   
+          Details: https://sg.run/dB2Y                                                              
+                                                                                                    
+          346┆ cipher = Cipher.getInstance("AES/ECB/NoPadding");
+                                                                                                
+    tika-pipes/tika-async-cli/src/main/java/org/apache/tika/async/cli/TikaConfigAsyncWriter.java
+   ❯❯❱ java.lang.security.audit.xxe.documentbuilderfactory-disallow-doctype-decl-missing.documentbuilderfactory-
+       disallow-doctype-decl-missing                                                                            
+          ❰❰ Blocking ❱❱
+          DOCTYPE declarations are enabled for this DocumentBuilderFactory. This is vulnerable to XML external
+          entity attacks. Disable this by setting the feature "http://apache.org/xml/features/disallow-       
+          doctype-decl" to true. Alternatively, allow DOCTYPE declarations and only prohibit external entities
+          declarations. This can be done by setting the features "http://xml.org/sax/features/external-       
+          general-entities" and "http://xml.org/sax/features/external-parameter-entities" to false.           
+          Details: https://sg.run/PYBz                                                                        
+                                                                                                              
+           ▶▶┆ Autofix ▶ dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+              dbf.newDocumentBuilder();                                                               
+           78┆ document = dbf.newDocumentBuilder().newDocument();
+                                                                                                  
+    tika-pipes/tika-httpclient-commons/src/main/java/org/apache/tika/client/HttpClientFactory.java
+   ❯❯❱ tache3.semgrep.tache3-tls-sans-verification
+          ❰❰ Blocking ❱❱
+          La validation TLS est desactivee : un TrustManager accepte tout certificat, ou le nom d'hote n'est
+          plus verifie. Risque d'attaque de l'homme du milieu.                                              
+                                                                                                            
+          289┆ sslsf = new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
+            ⋮┆----------------------------------------
+          322┆ : NoopHostnameVerifier.INSTANCE)
+   
+    ❯❱ java.lang.security.audit.crypto.use-of-sha1.use-of-sha1
+          ❰❰ Blocking ❱❱
+          Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision resistant and is
+          therefore not suitable as a cryptographic signature. Instead, use PBKDF2 for password hashing or 
+          SHA256 or SHA512 for other hash function applications.                                           
+          Details: https://sg.run/bXNp                                                                     
+                                                                                                           
+          466┆ MessageDigest sha = MessageDigest.getInstance("SHA-1");
+   
+    ❯❱ tache3.semgrep.tache3-hachage-faible
+          ❰❰ Blocking ❱❱
+          MD5 et SHA-1 ne resistent plus aux collisions. Utilise SHA-256.
+                                                                         
+          466┆ MessageDigest sha = MessageDigest.getInstance("SHA-1");
+                                                                                                   
+    tika-pipes/tika-pipes-core/src/main/java/org/apache/tika/pipes/core/PerClientServerManager.java
+    ❯❱ java.lang.security.audit.crypto.unencrypted-socket.unencrypted-socket
+          ❰❰ Blocking ❱❱
+          Detected use of a Java socket that is not encrypted. As a result, the traffic could be read by an
+          attacker intercepting the network traffic. Use an SSLSocket created by 'SSLSocketFactory' or     
+          'SSLServerSocketFactory' instead.                                                                
+          Details: https://sg.run/W8zA                                                                     
+                                                                                                           
+          291┆ serverSocket = new ServerSocket();
+                                                                                                
+    tika-pipes/tika-pipes-core/src/main/java/org/apache/tika/pipes/core/SharedServerManager.java
+    ❯❱ java.lang.security.audit.crypto.unencrypted-socket.unencrypted-socket
+          ❰❰ Blocking ❱❱
+          Detected use of a Java socket that is not encrypted. As a result, the traffic could be read by an
+          attacker intercepting the network traffic. Use an SSLSocket created by 'SSLSocketFactory' or     
+          'SSLServerSocketFactory' instead.                                                                
+          Details: https://sg.run/W8zA                                                                     
+                                                                                                           
+          219┆ Socket socket = new Socket();
+                                                                                               
+    tika-pipes/tika-pipes-core/src/main/java/org/apache/tika/pipes/core/server/PipesServer.java
+    ❯❱ java.lang.security.audit.crypto.unencrypted-socket.unencrypted-socket
+          ❰❰ Blocking ❱❱
+          Detected use of a Java socket that is not encrypted. As a result, the traffic could be read by an
+          attacker intercepting the network traffic. Use an SSLSocket created by 'SSLSocketFactory' or     
+          'SSLServerSocketFactory' instead.                                                                
+          Details: https://sg.run/W8zA                                                                     
+                                                                                                           
+          135┆ Socket socket = new Socket();
+                                                                                                                   
+    tika-pipes/tika-pipes-plugins/tika-pipes-http/src/main/java/org/apache/tika/pipes/fetcher/http/HttpFetcher.java
+    ❯❱ tache3.semgrep.tache3-secret-en-dur
+          ❰❰ Blocking ❱❱
+          Un secret est ecrit en clair dans le code. Lis-le depuis une variable d'environnement ou un
+          gestionnaire de secrets.                                                                   
+                                                                                                     
+          147┆ private static final String DEFAULT_JWT_SECRET = "tika-fetcher-2026-Sup3rS3cr3t!";
+   
+    ❯❱ tache3.semgrep.tache3-hachage-faible
+          ❰❰ Blocking ❱❱
+          MD5 et SHA-1 ne resistent plus aux collisions. Utilise SHA-256.
+                                                                         
+          539┆ MessageDigest md = MessageDigest.getInstance("MD5");
+   
+    ❯❱ java.lang.security.audit.crypto.use-of-md5.use-of-md5
+          ❰❰ Blocking ❱❱
+          Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is
+          therefore not suitable as a cryptographic signature. Use HMAC instead.                         
+          Details: https://sg.run/ryJn                                                                   
+                                                                                                         
+           ▶▶┆ Autofix ▶ "SHA-512"
+          539┆ MessageDigest md = MessageDigest.getInstance("MD5");
+   
+   ❯❯❱ tache3.semgrep.tache3-tls-sans-verification
+          ❰❰ Blocking ❱❱
+          La validation TLS est desactivee : un TrustManager accepte tout certificat, ou le nom d'hote n'est
+          plus verifie. Risque d'attaque de l'homme du milieu.                                              
+                                                                                                            
+          562┆ @Override
+          563┆ public void checkServerTrusted(X509Certificate[] chain, String authType) {
+          564┆ }
+   
+    ❯❱ java.lang.security.audit.weak-ssl-context.weak-ssl-context
+          ❰❰ Blocking ❱❱
+          An insecure SSL context was detected. TLS versions 1.0, 1.1, and all SSL versions are considered
+          weak encryption and are deprecated. Use SSLContext.getInstance("TLSv1.2") for the best security.
+          Details: https://sg.run/4x7E                                                                    
+                                                                                                          
+           ▶▶┆ Autofix ▶ SSLContext.getInstance("TLSv1.2")
+          567┆ SSLContext sslContext = SSLContext.getInstance("TLS");
+   
+   ❯❯❱ tache3.semgrep.tache3-tls-sans-verification
+          ❰❰ Blocking ❱❱
+          La validation TLS est desactivee : un TrustManager accepte tout certificat, ou le nom d'hote n'est
+          plus verifie. Risque d'attaque de l'homme du milieu.                                              
+                                                                                                            
+          571┆ .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                                                                                                     
+    tika-server/tika-server-core/src/main/java/org/apache/tika/server/core/resource/TikaResource.java
+   ❯❯❱ tache3.semgrep.tache3-injection-sql
+          ❰❰ Blocking ❱❱
+          Une valeur d'en-tete HTTP arrive dans une requete SQL : risque d'injection. Utilise un
+          PreparedStatement avec un parametre (?).                                              
+                                                                                                
+          259┆ try (ResultSet rs = stmt.executeQuery(sql)) {
+   
+   ❯❯❱ tache3.semgrep.tache3-traversee-de-chemin
+          ❰❰ Blocking ❱❱
+          Un nom de fichier venu d'un en-tete HTTP construit un chemin tel quel. Garde seulement le nom de
+          base avec FilenameUtils.getName.                                                                
+                                                                                                          
+          286┆ File target = new File(dayDir, fileName);
+   
+   ❯❯❱ tache3.semgrep.tache3-deserialisation
+          ❰❰ Blocking ❱❱
+          ObjectInputStream.readObject() sur des donnees recues du client : risque d'execution de code via une
+          chaine de gadgets. N'accepte que du JSON.                                                           
+                                                                                                              
+          298┆ Map<String, Object> entries = (Map<String, Object>) ois.readObject();
+   
+   ❯❯❱ tache3.semgrep.tache3-xss-reflechi
+          ❰❰ Blocking ❱❱
+          Un parametre de requete est renvoye sans echappement dans du HTML : XSS reflechi. Echappe la valeur
+          (StringEscapeUtils.escapeHtml4) ou reponds en text/plain.                                          
+                                                                                                             
+          529┆ String displayName = (name == null || name.isBlank()) ? "visiteur" : name.trim();
+          530┆ return "<html><body><h1>Bonjour " + displayName + " !</h1><p>" + GREETING +
+               "</p></body></html>";                                                      
+                                                                                                 
+    tika-translate/src/main/java/org/apache/tika/language/translate/impl/MicrosoftTranslator.java
+    ❯❱ tache3.semgrep.tache3-secret-en-dur
+          ❰❰ Blocking ❱❱
+          Un secret est ecrit en clair dans le code. Lis-le depuis une variable d'environnement ou un
+          gestionnaire de secrets.                                                                   
+                                                                                                     
+           43┆ public static final String SECRET_PROPERTY = "translator.client-secret";
+            ⋮┆----------------------------------------
+           45┆ public static final String DEFAULT_SECRET = "dummy-secret";
+
+                
+                
+┌──────────────┐
+│ Scan Summary │
+└──────────────┘
+✅ Scan completed successfully.
+ • Findings: 31 (31 blocking)
+ • Rules run: 67
+ • Targets scanned: 1475
+ • Parsed lines: ~99.9%
+ • Scan skipped: 
+   ◦ Files larger than  files 1.0 MB: 3
+   ◦ Files matching .semgrepignore patterns: 2503
+ • Scan was limited to files tracked by git
+ • For a detailed list of skipped files and lines, run semgrep with the --verbose flag
+Ran 67 rules on 1475 files: 31 findings.
+
+📢 Too many findings? Try Semgrep Pro for more powerful queries and less noise.
+   See https://sg.run/false-positives.
