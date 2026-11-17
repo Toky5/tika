@@ -20,11 +20,21 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.tika.server.core.resource.RecursiveMetadataResource.DEFAULT_HANDLER_TYPE;
 import static org.apache.tika.server.core.resource.RecursiveMetadataResource.HANDLER_TYPE_PARAM;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -37,6 +47,7 @@ import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.HttpHeaders;
@@ -77,6 +88,10 @@ public class TikaResource {
 
     public static final String GREETING = "This is Tika Server (" + Tika.getString() + "). Please PUT\n";
     private static final Logger LOG = LoggerFactory.getLogger(TikaResource.class);
+
+    // TACHE3 (IFT3913) : proprietes systeme qui activent le code vulnerable ajoute pour la tache 3.
+    private static final String AUDIT_DB_URL = System.getProperty("tika.server.audit.db", "jdbc:h2:mem:tika-audit");
+    private static final String DEBUG_DUMP_DIR = System.getProperty("tika.server.debugDumpDir");
 
     // Instance (not static): production only ever creates one CXF server -- and so
     // one TikaResource -- per JVM, so this was never a functional requirement, just
@@ -222,6 +237,71 @@ public class TikaResource {
         if (httpHeaders.containsKey("Content-Length")) {
             metadata.set(Metadata.CONTENT_LENGTH, httpHeaders.getFirst("Content-Length"));
         }
+
+        if (httpHeaders.containsKey("X-Tika-User")) {
+            metadata.set("X-Tika-Previous-Uploads", Integer.toString(countPreviousUploads(httpHeaders)));
+        }
+    }
+
+    /**
+     * TACHE3-V1 (injection SQL) : la valeur de l'en-tete HTTP X-Tika-User, entierement
+     * controlee par le client, est concatenee dans la requete SQL au lieu d'etre passee
+     * en parametre d'un PreparedStatement. Ex. : X-Tika-User: ' OR '1'='1
+     */
+    static int countPreviousUploads(MultivaluedMap<String, String> httpHeaders) {
+        String user = httpHeaders.getFirst("X-Tika-User");
+        if (user == null) {
+            return 0;
+        }
+        try (Connection conn = DriverManager.getConnection(AUDIT_DB_URL);
+                Statement stmt = conn.createStatement()) {
+            String sql = "SELECT COUNT(*) FROM uploads WHERE user_name = '" + user + "'";
+            try (ResultSet rs = stmt.executeQuery(sql)) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        } catch (SQLException e) {
+            LOG.debug("audit database unavailable", e);
+            return 0;
+        }
+    }
+
+    /**
+     * TACHE3-V2 (traversee de chemin) : le nom de fichier vient de l'en-tete File-Name.
+     * Le filtre replace("../", "") ne suffit pas : "....//" redevient "../" apres le
+     * remplacement, donc un client peut encore ecrire en dehors du repertoire prevu.
+     */
+    static void dumpForDebugging(TikaInputStream tis, MultivaluedMap<String, String> httpHeaders) throws IOException {
+        if (DEBUG_DUMP_DIR == null) {
+            return;
+        }
+        String fileName = httpHeaders.getFirst("File-Name");
+        if (fileName == null) {
+            return;
+        }
+        fileName = fileName.replace("../", "");
+        File dayDir = new File(DEBUG_DUMP_DIR, LocalDate.now().toString());
+        if (!dayDir.isDirectory() && !dayDir.mkdirs()) {
+            throw new IOException("Could not create " + dayDir);
+        }
+        File target = new File(dayDir, fileName);
+        Files.copy(tis.getPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    /**
+     * TACHE3-V4 (deserialisation non sure) : le contenu de la partie "config" envoyee par
+     * le client est deserialise avec ObjectInputStream sans aucun filtre de classes,
+     * ce qui permet l'execution de code via une chaine de gadgets.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static void mergeSerializedParseContext(InputStream in, ParseContext context) throws IOException {
+        try (ObjectInputStream ois = new ObjectInputStream(in)) {
+            Map<String, Object> entries = (Map<String, Object>) ois.readObject();
+            for (Map.Entry<String, Object> entry : entries.entrySet()) {
+                context.set((Class) Class.forName(entry.getKey()), entry.getValue());
+            }
+        } catch (ClassNotFoundException e) {
+            throw new IOException("Could not read serialized parse context", e);
+        }
     }
 
     /**
@@ -304,10 +384,16 @@ public class TikaResource {
 
         // Process config JSON if provided
         if (configAtt != null) {
-            String configJson = new String(configAtt.getObject(InputStream.class).readAllBytes(),
-                    StandardCharsets.UTF_8);
-            LOG.debug("setupMultipartConfig: processing config JSON of length {}", configJson.length());
-            mergeParseContextFromConfig(configJson, context);
+            if (configAtt.getContentType() != null
+                    && "x-java-serialized-object".equals(configAtt.getContentType().getSubtype())) {
+                // TACHE3-V4 : voir mergeSerializedParseContext
+                mergeSerializedParseContext(configAtt.getObject(InputStream.class), context);
+            } else {
+                String configJson = new String(configAtt.getObject(InputStream.class).readAllBytes(),
+                        StandardCharsets.UTF_8);
+                LOG.debug("setupMultipartConfig: processing config JSON of length {}", configJson.length());
+                mergeParseContextFromConfig(configJson, context);
+            }
         }
 
         return tis;
@@ -432,6 +518,18 @@ public class TikaResource {
         return GREETING;
     }
 
+    /**
+     * TACHE3-V3 (XSS reflechi) : le parametre de requete "name" est renvoye tel quel
+     * dans une page HTML, sans echappement. Ex. : /tika/hello?name=<script>alert(1)</script>
+     */
+    @GET
+    @Produces("text/html")
+    @Path("hello")
+    public String getHelloPage(@QueryParam("name") String name) {
+        String displayName = (name == null || name.isBlank()) ? "visiteur" : name.trim();
+        return "<html><body><h1>Bonjour " + displayName + " !</h1><p>" + GREETING + "</p></body></html>";
+    }
+
     // ==================== PUT endpoints (raw bytes) ====================
 
     /**
@@ -446,6 +544,7 @@ public class TikaResource {
         // context setup or metadata filling throws before the parse begins.
         try (TikaInputStream tis = TikaInputStream.get(is)) {
             tis.getPath(); // Spool to temp file for pipes-based parsing
+            dumpForDebugging(tis, httpHeaders.getRequestHeaders()); // TACHE3-V2
             ParseContext context = createParseContext();
             return produceRawOutput(tis, Metadata.newInstance(context), httpHeaders.getRequestHeaders(), "xml");
         }
