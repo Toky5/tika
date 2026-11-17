@@ -470,7 +470,15 @@ echo "$RAPPORT" >> "$GITHUB_STEP_SUMMARY"
 
 Nous ne dirons pas ce que contient la vidéo. Disons seulement qu'elle est très populaire, qu'elle date de 1987 et que tout développeur devrait la voir au moins une fois. Pour le découvrir, il suffit de casser un test, ou plus simplement d'ouvrir une issue sur notre dépôt. Nous vous le recommandons vivement.
 
-Pour le vérifier, il suffit d'[ouvrir une issue sur notre dépôt](https://github.com/Toky5/tika/issues/new) : le diagnostic arrive en commentaire quelques secondes plus tard.
+Nous avons bien sûr testé les deux déclencheurs sur nous-mêmes. Pour le test raté, nous avons ouvert une pull request (exécution #11) qui casse volontairement une assertion de `MediaTypeTest` en attendant `"text/rickroll"` au lieu de `"text/plain"`. Le job `semgrep` passe, puisqu'un test modifié n'ajoute aucune vulnérabilité, puis `build` échoue et le diagnostic s'affiche aussitôt dans le résumé de l'exécution. Nous avons ensuite fermé la pull request sans la fusionner, Rick n'ayant pas sa place dans les types MIME officiels.
+
+<p align="center"><img src="tache3/captures/rickroll-test-casse.png" height="500" alt="Résumé de l'exécution #11 : semgrep réussit, build échoue, le rapport de diagnostic s'affiche"/></p>
+
+Pour l'issue, le diagnostic est arrivé en commentaire quelques secondes après l'ouverture, ce qui est un excellent temps de réponse pour un service d'assistance.
+
+<p align="center"><img src="tache3/captures/rickroll-issue.png" height="500" alt="Le rapport de diagnostic publié en commentaire d'une issue"/></p>
+
+Vous pouvez faire l'essai vous-même en [ouvrant une issue sur notre dépôt](https://github.com/Toky5/tika/issues/new). Promis, nous ne vous laisserons jamais tomber.
 
 ## 6. Crédits
 
