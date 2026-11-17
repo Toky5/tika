@@ -1,7 +1,5 @@
 # IFT3913 : Tâche 3, Semgrep dans Apache Tika
 
-*Le rapport de la tâche 2 se trouve dans [`README-tache2.md`](README-tache2.md).*
-
 <p align="center">
   <a href="https://github.com/semgrep/semgrep">
     <img src="https://github.com/semgrep/semgrep/raw/develop/images/semgrep-logo-dark.svg" height="100" alt="Logo de Semgrep"/>
