@@ -1,0 +1,19 @@
+# IFT3913, Tache 3 : n'importe qui peut verifier l'action de diagnostic sans casser
+# de test. Il suffit d'ouvrir une issue : l'action y repond aussitot (percentage 100).
+name: rickroll
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Rapport de diagnostic
+        uses: ./.github/actions/rickroll
+        with:
+          percentage: 100

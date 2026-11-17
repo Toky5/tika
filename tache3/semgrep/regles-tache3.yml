@@ -1,0 +1,126 @@
+# IFT3913 - Tache 3 : regles Semgrep, une par vulnerabilite (V1 a V7).
+#
+# Trois regles restent simples, dans l'esprit de nos exemples de la tache 1 (V4, V5
+# et V6). Quatre sont plus complexes : V1 utilise le mode taint, V2 exclut un
+# nettoyage correct avec pattern-not-inside, V3 suit la valeur a travers une
+# variable intermediaire, et V7 fait de la correspondance structurelle.
+#
+# Les regles decrivent la forme du defaut, pas notre code exact, donc elles
+# trouveraient le meme probleme ailleurs dans Tika.
+
+rules:
+
+  # V1 - injection SQL (COMPLEXE : mode taint)
+  - id: tache3-injection-sql
+    mode: taint
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Une valeur d'en-tete HTTP arrive dans une requete SQL : risque d'injection.
+      Utilise un PreparedStatement avec un parametre (?).
+    metadata:
+      cwe: "CWE-89"
+    pattern-sources:
+      - pattern: (MultivaluedMap $H).getFirst(...)
+    pattern-sanitizers:
+      - pattern: Integer.parseInt(...)
+    pattern-sinks:
+      - patterns:
+          - pattern: $STMT.executeQuery($SQL)
+          - focus-metavariable: $SQL
+
+  # V2 - traversee de chemin (COMPLEXE : exclusion du bon nettoyage)
+  - id: tache3-traversee-de-chemin
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Un nom de fichier venu d'un en-tete HTTP construit un chemin tel quel.
+      Garde seulement le nom de base avec FilenameUtils.getName.
+    metadata:
+      cwe: "CWE-22"
+    patterns:
+      - pattern-inside: |
+          String $NAME = $H.getFirst(...);
+          ...
+      - pattern-either:
+          - pattern: new File($DIR, $NAME)
+          - pattern: Paths.get($DIR, ..., $NAME)
+      - pattern-not-inside: |
+          $NAME = FilenameUtils.getName(...);
+          ...
+
+  # V3 - XSS reflechi (COMPLEXE : variable intermediaire)
+  - id: tache3-xss-reflechi
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Un parametre de requete est renvoye sans echappement dans du HTML : XSS reflechi.
+      Echappe la valeur (StringEscapeUtils.escapeHtml4) ou reponds en text/plain.
+    metadata:
+      cwe: "CWE-79"
+    patterns:
+      - pattern-inside: |
+          @Produces($MEDIA)
+          $RET $M(..., @QueryParam($N) String $P, ...) { ... }
+      - metavariable-regex:
+          metavariable: $MEDIA
+          regex: .*html.*
+      - pattern-either:
+          - pattern: return <... $P ...>;
+          - pattern: |
+              $T $X = <... $P ...>;
+              ...
+              return <... $X ...>;
+      - pattern-not: return <... StringEscapeUtils.escapeHtml4(...) ...>;
+      - pattern-not-inside: |
+          $T $X = <... StringEscapeUtils.escapeHtml4(...) ...>;
+          ...
+
+  # V4 - deserialisation non sure
+  - id: tache3-deserialisation
+    languages: [java]
+    severity: ERROR
+    message: >-
+      ObjectInputStream.readObject() sur des donnees recues du client : risque
+      d'execution de code via une chaine de gadgets. N'accepte que du JSON.
+    metadata:
+      cwe: "CWE-502"
+    pattern: (ObjectInputStream $OIS).readObject()
+
+  # V5 - secret code en dur
+  - id: tache3-secret-en-dur
+    languages: [java]
+    severity: WARNING
+    message: >-
+      Un secret est ecrit en clair dans le code. Lis-le depuis une variable
+      d'environnement ou un gestionnaire de secrets.
+    metadata:
+      cwe: "CWE-798"
+    pattern-regex: '(?i)String\s+\w*(secret|password|token)\w*\s*=\s*"[^"]{12,}"'
+
+  # V6 - hachage faible
+  - id: tache3-hachage-faible
+    languages: [java]
+    severity: WARNING
+    message: >-
+      MD5 et SHA-1 ne resistent plus aux collisions. Utilise SHA-256.
+    metadata:
+      cwe: "CWE-328"
+    pattern-either:
+      - pattern: MessageDigest.getInstance("MD5")
+      - pattern: MessageDigest.getInstance("SHA-1")
+
+  # V7 - validation TLS desactivee (COMPLEXE : correspondance structurelle)
+  - id: tache3-tls-sans-verification
+    languages: [java]
+    severity: ERROR
+    message: >-
+      La validation TLS est desactivee : un TrustManager accepte tout certificat,
+      ou le nom d'hote n'est plus verifie. Risque d'attaque de l'homme du milieu.
+    metadata:
+      cwe: "CWE-295"
+    pattern-either:
+      - patterns:
+          - pattern-inside: new X509TrustManager() { ... }
+          - pattern: public void checkServerTrusted(...) {}
+      - pattern: NoopHostnameVerifier.INSTANCE

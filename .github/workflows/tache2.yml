@@ -1,5 +1,10 @@
 # IFT3913, Tache 2: build tika-core (and the modules it depends on) and run its tests,
 # including the ChatUniTest-generated and hand-written tests for MediaType and Patterns.
+#
+# IFT3913, Tache 3: un job Semgrep s'execute avant le build. Il fait echouer le workflow
+# (et le build ne demarre pas) si le commit introduit une NOUVELLE vulnerabilite par rapport
+# au commit precedent. Semgrep est installe sur le runner GitHub a chaque execution, donc
+# le workflow fonctionne pour n'importe qui, sans rien installer sur sa machine.
 name: tache2
 
 on:
@@ -10,9 +15,76 @@ on:
   workflow_dispatch:
 
 jobs:
+  semgrep:
+    name: Semgrep (nouvelles vulnerabilites)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # tout l'historique : --baseline-commit a besoin du commit de reference
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Installer Semgrep
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "semgrep>=1.100,<2"
+          semgrep --version
+
+      - name: Choisir le commit de reference
+        id: base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE="$PR_BASE"
+          else
+            BASE="$PUSH_BEFORE"
+          fi
+          # premier push d'une branche (0000...) ou lancement manuel : on compare au parent
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE=$(git rev-parse HEAD~1)
+          fi
+          echo "Commit de reference : $BASE"
+          echo "sha=$BASE" >> "$GITHUB_OUTPUT"
+
+      - name: Rapport complet (tous les resultats, informatif)
+        run: |
+          # un seul scan : JSON dans un fichier, texte lisible dans le journal et dans un fichier
+          semgrep scan --config tache3/semgrep --config p/java --metrics=off \
+            --json-output=semgrep-rapport.json | tee semgrep-rapport.txt
+
+      - name: Publier le rapport
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-rapport
+          path: |
+            semgrep-rapport.json
+            semgrep-rapport.txt
+          if-no-files-found: ignore
+
+      - name: Echouer si le commit introduit une nouvelle vulnerabilite
+        run: |
+          semgrep scan --config tache3/semgrep --config p/java --metrics=off \
+            --error --baseline-commit "${{ steps.base.outputs.sha }}"
+
   build:
+    needs: semgrep
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
+      # pour que l'action de diagnostic puisse commenter la pull request
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v6
@@ -24,3 +96,9 @@ jobs:
           cache: 'maven'
       - name: Build and test tika-core
         run: ./mvnw -B install -pl :tika-core -am
+      # Tache 3 : si un test de tika-core echoue, l'action maison prend le relais.
+      - name: Rapport de diagnostic si un test echoue
+        if: failure()
+        uses: ./.github/actions/rickroll
+        with:
+          percentage: 100

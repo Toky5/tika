@@ -1,0 +1,48 @@
+# IFT3913, Tache 3 : action composite reutilisable, inspiree de TejasvOnly/random-rickroll.
+# L'action d'origine ne repond qu'a l'ouverture d'une issue (sinon : "No issue found")
+# et tourne sur Node 12, que GitHub ne supporte plus. Celle-ci garde son idee et son
+# parametre percentage, et fonctionne aussi quand un test echoue apres un push ou dans une PR.
+name: 'Rapport de diagnostic des tests'
+description: 'Remonte le moral de la personne qui vient de casser un test.'
+inputs:
+  percentage:
+    description: 'Sur cent echecs, combien recoivent le rapport de diagnostic (100 = tout le monde)'
+    required: false
+    default: '100'
+  github-token:
+    description: 'Jeton utilise pour commenter la pull request ou l issue'
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - name: Diagnostic
+      shell: bash
+      env:
+        PERCENTAGE: ${{ inputs.percentage }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        ISSUE_NUMBER: ${{ github.event.issue.number }}
+        GIF: https://user-images.githubusercontent.com/37572049/90699500-0cc3ec00-e2a1-11ea-8d13-989526e86b0e.gif
+        VIDEO: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+      run: |
+        if [ $((RANDOM % 100)) -ge "$PERCENTAGE" ]; then
+          echo "Fine, you win this time."
+          exit 0
+        fi
+        echo "Gottem!!"
+        echo "::error title=Un test a echoue::Un rapport de diagnostic detaille est disponible : $VIDEO"
+        RAPPORT="## Rapport de diagnostic de l'echec
+
+        ![diagnostic]($GIF)
+
+        [Voir l'explication detaillee de l'echec]($VIDEO)"
+        echo "$RAPPORT" >> "$GITHUB_STEP_SUMMARY"
+        if [ -n "$ISSUE_NUMBER" ]; then
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$RAPPORT" \
+            || echo "Impossible de commenter l'issue"
+        fi
+        if [ -n "$PR_NUMBER" ]; then
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$RAPPORT" \
+            || echo "Impossible de commenter la pull request (jeton en lecture seule ?)"
+        fi
