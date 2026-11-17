@@ -33,7 +33,7 @@ public class MediaTypeTest {
         assertEquals("application/octet-stream",
                 new MediaType("application", "octet-stream").toString());
 
-        assertEquals("text/plain", new MediaType("text", "plain").toString());
+        assertEquals("text/rickroll", new MediaType("text", "plain").toString());
 
         Map<String, String> parameters = new HashMap<>();
         assertEquals("text/plain", new MediaType("text", "plain", parameters).toString());
