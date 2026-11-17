@@ -403,7 +403,7 @@ On n'ajoute que le certificat nécessaire dans un magasin de confiance et on gar
 
 ## 5. Côté humour
 
-<p align="center"><img src="https://imgs.search.brave.com/a5qZcBdpt87uvrss2IscJMnalBG7sPExUD_IvGy2Ics/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9lZmIy/OC53b3JkcHJlc3Mu/Y29tL3dwLWNvbnRl/bnQvdXBsb2Fkcy8y/MDE0LzA0L3NwYWNl/YmFsbHNfbHVkaWNy/b3VzX3NwZWVkLmpw/Zz93PTMwMCZoPTE2/MA" height="250" alt="Mème Ludicrous speed, tiré du film Spaceballs"/></p>
+<p align="center"><img src="https://i.pinimg.com/736x/f4/17/56/f417567d5da43b833144b04b5084846d.jpg" height="250" alt="Mème Ludicrous speed, tiré du film Spaceballs"/></p>
 
 Semgrep analyse le code à la vitesse *ludicrous* ; notre CI, elle, échoue maintenant à la vitesse ludicrous. Mais un build rouge, c'est triste, alors nous avons voulu que la CI promette à ses développeurs de ne jamais les laisser tomber.
 
@@ -417,15 +417,11 @@ L'action `random-rickroll` ne sait parler qu'aux issues : après un test raté, 
           percentage: 100
 ```
 
-Avec `percentage: 100`, personne n'y échappe. L'action ajoute au résumé de l'exécution un « rapport de diagnostic » très détaillé, avec une animation et un lien vers une explication vidéo, et le publie en commentaire si l'échec arrive dans une pull request. Le workflow `rickroll.yml` fait la même chose à l'ouverture d'une issue, pour que personne ne soit obligé de casser un test pour en profiter.
+Avec `percentage: 100`, personne n'y échappe.
 
 Nous ne dirons pas ce que contient la vidéo, seulement qu'elle date de 1987. Pour le tester, nous avons ouvert une pull request qui casse une assertion de `MediaTypeTest` (exécution #11), puis nous l'avons fermée sans la fusionner.
 
-<p align="center"><img src="tache3/captures/rickroll-test-casse.png" height="500" alt="Exécution #11 : semgrep réussit, build échoue, le rapport de diagnostic s'affiche"/></p>
-
 Pour l'issue, le diagnostic arrive en commentaire en quelques secondes.
-
-<p align="center"><img src="tache3/captures/rickroll-issue.png" height="500" alt="Le rapport de diagnostic publié en commentaire d'une issue"/></p>
 
 Essayez vous-même en [ouvrant une issue sur notre dépôt](https://github.com/Toky5/tika/issues/new). Promis, nous ne vous laisserons jamais tomber.
 
